@@ -72,7 +72,12 @@ if(isset($_POST['add_to_cart'])){
     if(!$found){
         $_SESSION['cart'][] = $cart_item;
     }
-    header("Location: index.php?added=1");
+    // ✅ FIX: Jika "Beli Sekarang", langsung ke checkout
+    if(isset($_POST['buy_now']) && $_POST['buy_now'] == '1'){
+        header("Location: checkout.php");
+    } else {
+        header("Location: index.php?added=1");
+    }
     exit;
 }
 
@@ -99,7 +104,34 @@ while($row = mysqli_fetch_assoc($result)){
         'variants' => []
     ];
 }
-
+// 🔥 Ambil toppings & levels untuk setiap produk
+foreach($products as $k => $p){
+    $pid = (int)$p['id'];
+    
+    // Toppings
+    $t_query = mysqli_query($conn, "
+        SELECT t.id, t.name, t.price
+        FROM product_toppings pt
+        JOIN toppings t ON t.id = pt.topping_id
+        WHERE pt.product_id = $pid AND t.is_available = 1
+        ORDER BY t.display_order
+    ");
+    $toppings = [];
+    while($tr = mysqli_fetch_assoc($t_query)) $toppings[] = $tr;
+    $products[$k]['toppings'] = $toppings;
+    
+    // Levels
+    $l_query = mysqli_query($conn, "
+        SELECT l.id, l.name, l.extra_price
+        FROM product_levels pl
+        JOIN levels l ON l.id = pl.level_id
+        WHERE pl.product_id = $pid AND l.is_available = 1
+        ORDER BY l.display_order
+    ");
+    $levels = [];
+    while($lr = mysqli_fetch_assoc($l_query)) $levels[] = $lr;
+    $products[$k]['levels'] = $levels;
+}
 $currentPage = basename($_SERVER['PHP_SELF']);
 
 // Ambil hero images dari database
@@ -2173,33 +2205,45 @@ document.getElementById('trackingInput')?.addEventListener('keypress', function(
 </div>
 
           <!-- Bottom Action Bar -->
-<div class="modal-footer" style="border-top: 1px solid #e0e0e0; padding: 12px 16px; background: white; position: sticky; bottom: 0;">
-    <button class="btn btn-link" style="text-decoration: none; color: #333; padding: 8px;" onclick="alert('Fitur toko segera hadir!')">
-        <i class="fas fa-store" style="display: block; font-size: 1.2rem;"></i>
+<!-- ✅ FIX: Form Add to Cart & Beli Sekarang (dipindah ke luar modal-footer agar valid HTML) -->
+<form method="POST" id="modalFormPesan" action="index.php">
+    <input type="hidden" name="add_to_cart" value="1">
+    <input type="hidden" name="id"      id="modal-product-id">
+    <input type="hidden" name="name"    id="modal-product-name">
+    <input type="hidden" name="price"   id="modal-product-price">
+    <input type="hidden" name="variant" id="modal-product-variant" value="">
+    <input type="hidden" name="buy_now" id="modal-buy-now" value="0">
+</form>
+
+<div class="modal-footer" style="border-top: 1px solid #e0e0e0; padding: 12px 16px; background: white; position: sticky; bottom: 0; display: flex; align-items: center; gap: 8px;">
+
+    <!-- ✅ FIX: Tombol Toko → buka profil toko di modal -->
+    <button class="btn btn-link" style="text-decoration: none; color: #333; padding: 8px; display: flex; flex-direction: column; align-items: center;" onclick="showStoreProfile()">
+        <i class="fas fa-store" style="font-size: 1.2rem;"></i>
         <span style="font-size: 0.75rem;">Toko</span>
     </button>
-    <button type="button" onclick="chatWhatsApp(<?= $product['id'] ?>, '<?= addslashes($product['name']) ?>')" style="background: none; border: none; cursor: pointer; padding: 8px;">
-    <i class="fas fa-comments"></i>
-    <div style="font-size: 0.75rem; margin-top: 2px;">Chat</div>
+
+    <!-- ✅ FIX: Tombol Chat → WhatsApp dengan nama produk otomatis -->
+    <button type="button" onclick="chatWhatsAppModal()" style="background: none; border: none; cursor: pointer; padding: 8px; display: flex; flex-direction: column; align-items: center; color: #333;">
+        <i class="fas fa-comments" style="font-size: 1.2rem;"></i>
+        <span style="font-size: 0.75rem; margin-top: 2px;">Chat</span>
     </button>
-    
-    <!-- ✅ Form untuk Add to Cart dari Modal Detail -->
-    <form method="POST" id="modalFormPesan" action="index.php" style="display: contents;">
-        <input type="hidden" name="id" id="modal-product-id">
-        <input type="hidden" name="name" id="modal-product-name">
-        <input type="hidden" name="price" id="modal-product-price">
-        <input type="hidden" name="variant" value="">
-        <input type="hidden" name="add_to_cart" value="1">
-        
-        <button type="button" class="btn" style="background: #f0f0f0; border-radius: 50%; width: 48px; height: 48px; padding: 0; display: flex; align-items: center; justify-content: center; margin: 0 8px;" onclick="addToCartFromModal()">
-            <i class="fas fa-shopping-cart" style="color: #00B14F; font-size: 1.3rem;"></i>
-        </button>
-        
-        <button type="button" id="btnBeliSekarang" onclick="buyNowFromModal()" style="background: #00B14F; color: white; border: none; border-radius: 24px; padding: 12px 32px; font-weight: 600; cursor: pointer;">
-    <div style="font-size: 1rem;">Beli sekarang</div>
-    <div style="font-size: 0.85rem; opacity: 0.9;"><span id="md-price-bottom">Rp 0</span> | Pengiriman gratis</div>
-</button>
-    </form>
+
+    <!-- ✅ FIX: Tombol Keranjang → submit form, buy_now=0 -->
+    <button type="submit" form="modalFormPesan"
+        onclick="document.getElementById('modal-buy-now').value='0'"
+        style="background: #f0f0f0; border: none; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; margin: 0 4px; cursor: pointer; flex-shrink: 0;">
+        <i class="fas fa-shopping-cart" style="color: var(--primary); font-size: 1.3rem;"></i>
+    </button>
+
+    <!-- ✅ FIX: Tombol Beli Sekarang → submit form, buy_now=1 -->
+    <button type="submit" form="modalFormPesan"
+        onclick="document.getElementById('modal-buy-now').value='1'"
+        style="background: var(--primary); color: white; border: none; border-radius: 24px; padding: 10px 24px; font-weight: 600; cursor: pointer; flex: 1;">
+        <div style="font-size: 0.95rem;">Beli sekarang</div>
+        <div style="font-size: 0.8rem; opacity: 0.85;"><span id="md-price-bottom">Rp 0</span> | Pengiriman gratis</div>
+    </button>
+
 </div>
         </div>
     </div>
@@ -2320,9 +2364,18 @@ modal.addEventListener('show.bs.modal', function (event) {
     document.getElementById('md-name').innerText = button.getAttribute('data-name');
     document.getElementById('md-price').innerText = "Rp " + parseInt(button.getAttribute('data-price')).toLocaleString('id-ID');
     document.getElementById('md-desc').innerText = button.getAttribute('data-desc') || '';
-    document.getElementById('md-id').value = button.getAttribute('data-id');
-    document.getElementById('md-form-name').value = button.getAttribute('data-name');
-    document.getElementById('md-form-price').value = button.getAttribute('data-price');
+
+    // ✅ FIX: isi harga di tombol Beli Sekarang
+    document.getElementById('md-price-bottom').innerText = "Rp " + parseInt(button.getAttribute('data-price')).toLocaleString('id-ID');
+
+    // ✅ FIX: isi semua hidden input form supaya Keranjang & Beli Sekarang berfungsi
+    document.getElementById('modal-product-id').value    = button.getAttribute('data-id');
+    document.getElementById('modal-product-name').value  = button.getAttribute('data-name');
+    document.getElementById('modal-product-price').value = button.getAttribute('data-price');
+    document.getElementById('modal-buy-now').value       = '0'; // reset tiap buka modal
+
+    // ✅ FIX: simpan nama produk untuk fungsi chat WhatsApp modal
+    document.getElementById('modalFormPesan').dataset.productName = button.getAttribute('data-name');
 });
 
 // Variant Modal
@@ -2512,45 +2565,7 @@ function buyNowFromModal() {
 }
 
 // ✅ Update hidden form values saat modal dibuka
-var modal = document.getElementById('modalDetail');
-modal.addEventListener('show.bs.modal', function (event) {
-    var button = event.relatedTarget;
-    
-    // Update text content (dengan pengecekan null)
-const mdName = document.getElementById('md-name');
-const mdPrice = document.getElementById('md-price');
-const mdPriceBottom = document.getElementById('md-price-bottom');
-const mdDesc = document.getElementById('md-desc');
-
-if(mdName) mdName.innerText = button.getAttribute('data-name');
-if(mdPrice) mdPrice.innerText = "Rp " + parseInt(button.getAttribute('data-price')).toLocaleString('id-ID');
-if(mdPriceBottom) mdPriceBottom.innerText = "Rp " + parseInt(button.getAttribute('data-price')).toLocaleString('id-ID');
-if(mdDesc) mdDesc.innerText = button.getAttribute('data-desc');
-    
-    // ✅ Update hidden form values untuk add to cart
-    document.getElementById('modal-product-id').value = button.getAttribute('data-id');
-    document.getElementById('modal-product-name').value = button.getAttribute('data-name');
-    document.getElementById('modal-product-price').value = button.getAttribute('data-price');
-    
-    // Set gambar dengan error handling
-    var imgSrc = button.getAttribute('data-img');
-    var modalImg = document.getElementById('md-img');
-    
-    if(imgSrc && imgSrc !== ''){
-        modalImg.src = imgSrc;
-        modalImg.onerror = function() {
-            this.src = 'assets/images/placeholder.png';
-        };
-        modalImg.style.display = 'block';
-    } else {
-        modalImg.src = 'assets/images/placeholder.png';
-    }
-    
-    // Update form variant jika ada
-    if(document.getElementById('md-id')) document.getElementById('md-id').value = button.getAttribute('data-id');
-    if(document.getElementById('md-form-name')) document.getElementById('md-form-name').value = button.getAttribute('data-name');
-    if(document.getElementById('md-form-price')) document.getElementById('md-form-price').value = button.getAttribute('data-price');
-});
+// (sudah dipindah ke listener show.bs.modal di atas)
 
 // Show success message if added to cart
 <?php if(isset($_GET['added']) && $_GET['added'] == '1'): ?>
@@ -2570,6 +2585,14 @@ function openChat() {
     // Buka WhatsApp chat
     const phone = '6281934174198';
     const message = 'Halo Texcer Hot, saya mau tanya-tanya tentang produknya';
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
+}
+
+// ✅ FIX: Fungsi Chat dari modal - kirim nama produk ke WhatsApp
+function chatWhatsAppModal() {
+    const productName = document.getElementById('modalFormPesan').dataset.productName || 'produk ini';
+    const phone = '6281934174198';
+    const message = `Halo Texcer Hot 👋\n\nSaya tertarik dengan: *${productName}*\nMohon info lebih lanjut.\n\nTerima kasih! 🙏`;
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
 }
 

@@ -52,7 +52,8 @@ if(isset($_POST['process_order'])){
     $notes = $_POST['notes'];
     $total = 0;
     if(!empty($_SESSION['cart'])){
-        foreach($_SESSION['cart'] as $item) $total += ($item['price'] * $item['qty']);
+        // FIX: cast price ke float dan qty ke int sebelum perkalian
+        foreach($_SESSION['cart'] as $item) $total += ((float)$item['price'] * (int)$item['qty']);
         $sql_order = "INSERT INTO orders (customer_name, customer_phone, customer_address, customer_city, customer_province, total_price, status, payment_method) 
                       VALUES ('$name', '$phone', '$address', '$city', '$province', '$total', 'Pending', '$payment_method')";
         if(mysqli_query($conn, $sql_order)){
@@ -61,7 +62,8 @@ if(isset($_POST['process_order'])){
             mysqli_query($conn, "UPDATE orders SET order_number = '$order_number' WHERE id = $order_id");
             notifyOrderCreated($conn, $phone, $order_id, $order_number);
             foreach($_SESSION['cart'] as $item){
-                $sub = $item['price'] * $item['qty'];
+                // FIX: cast price ke float dan qty ke int
+                $sub = (float)$item['price'] * (int)$item['qty'];
                 mysqli_query($conn, "INSERT INTO order_items (order_id, product_name, price, qty, subtotal) VALUES ('$order_id', '{$item['name']}', '{$item['price']}', '{$item['qty']}', '$sub')");
             }
             unset($_SESSION['cart']);
@@ -105,8 +107,9 @@ if(isset($_SESSION['user_phone'])){
 
 if(!empty($_SESSION['cart'])){
     foreach($_SESSION['cart'] as $item){
-        $grand_total += ($item['price'] * $item['qty']);
-        $total_items += $item['qty'];
+        // FIX: cast price ke float dan qty ke int
+        $grand_total += ((float)$item['price'] * (int)$item['qty']);
+        $total_items += (int)$item['qty'];
     }
 }
 ?>
@@ -890,8 +893,11 @@ body {
 
         <!-- Cart Items -->
         <?php foreach($_SESSION['cart'] as $index => $item):
-            $subtotal = $item['price'] * $item['qty'];
-            $originalPrice = $item['price'] * 1.25; // simulasi harga asli
+            // FIX: cast tipe data saat kalkulasi tampilan
+            $itemPrice    = (float)$item['price'];
+            $itemQty      = (int)$item['qty'];
+            $subtotal     = $itemPrice * $itemQty;
+            $originalPrice = $itemPrice * 1.25; // simulasi harga asli
             $discount = 20;
         ?>
         <div class="cart-item" id="item-<?= $index ?>">
@@ -932,7 +938,7 @@ body {
                 <?php endif; ?>
 
                 <div class="item-price-row">
-                    <span class="item-price">Rp<?= number_format($item['price'], 0, ',', '.') ?></span>
+                    <span class="item-price">Rp<?= number_format($itemPrice, 0, ',', '.') ?></span>
                     <span class="item-original-price">Rp<?= number_format($originalPrice, 0, ',', '.') ?></span>
                     <span class="discount-badge">-<?= $discount ?>%</span>
                 </div>
@@ -949,7 +955,7 @@ body {
                     <button class="qty-btn minus"
                         onclick="updateQty(<?= $index ?>, -1)"
                         title="Kurangi">−</button>
-                    <div class="qty-value" id="qty-<?= $index ?>"><?= $item['qty'] ?></div>
+                    <div class="qty-value" id="qty-<?= $index ?>"><?= $itemQty ?></div>
                     <button class="qty-btn plus"
                         onclick="updateQty(<?= $index ?>, 1)"
                         title="Tambah">+</button>
@@ -1110,7 +1116,7 @@ body {
                     <div class="total-summary">
                         <div class="total-row">
                             <span class="label">Subtotal (<?= $total_items ?> item)</span>
-                            <span>Rp<?= number_format($grand_total ?? 0, 0, ',', '.') ?></span>
+                            <span>Rp<?= number_format($grand_total, 0, ',', '.') ?></span>
                         </div>
                         <div class="total-row">
                             <span class="label">Ongkir</span>
@@ -1118,7 +1124,7 @@ body {
                         </div>
                         <div class="total-row">
                             <span>Total Bayar</span>
-                            <span class="value-big">Rp<?= number_format($grand_total ?? 0, 0, ',', '.') ?></span>
+                            <span class="value-big">Rp<?= number_format($grand_total, 0, ',', '.') ?></span>
                         </div>
                     </div>
 
@@ -1190,7 +1196,6 @@ function updateTotal() {
     let count = 0;
     document.querySelectorAll('.item-checkbox').forEach(cb => {
         if(cb.checked) {
-            // Get subtotal from data-price attribute (set at render time)
             total += parseInt(cb.dataset.price) || 0;
             count++;
         }
@@ -1203,7 +1208,6 @@ function updateTotal() {
 
 // ── FLASH SALE COUNTDOWN ──
 function startCountdown() {
-    // Set end time ~3 hours from now for demo
     const endTime = new Date().getTime() + (3 * 60 * 60 * 1000);
     setInterval(() => {
         const now = new Date().getTime();
@@ -1219,7 +1223,6 @@ function startCountdown() {
 
 // ==================== 🔥 FITUR TAMBAHAN TEXCER HOT ====================
 
-// 🔥 BELI SEKARANG: Tambah ke cart + langsung redirect ke checkout
 function buyNow(productId, variant = ''){
     const form = document.createElement('form');
     form.method = 'POST';
@@ -1235,7 +1238,6 @@ function buyNow(productId, variant = ''){
     form.submit();
 }
 
-// 🛒 TAMBAH KE KERANJANG: Simpan produk ke session cart
 function addToCart(productId, variant = ''){
     const form = document.createElement('form');
     form.method = 'POST';
@@ -1250,11 +1252,9 @@ function addToCart(productId, variant = ''){
     form.submit();
 }
 
-// 💬 CHAT WHATSAPP: Buka WA dengan pesan otomatis
 function chatWhatsApp(productId = null, productName = ''){
     const phone = '6281234567890'; // ⚠️ GANTI DENGAN NOMOR WA ASLI TEXCER HOT!
     let message = 'Halo Texcer Hot 👋\n\n';
-    
     if(productName){
         message += `Saya tertarik dengan produk: *${productName}*\n`;
         message += `Mohon info lebih lanjut.\n\n`;
@@ -1262,12 +1262,10 @@ function chatWhatsApp(productId = null, productName = ''){
         message += `Saya ingin bertanya.\n\n`;
     }
     message += `Terima kasih! 🙏`;
-    
     const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
 }
 
-// 🏪 INFO TOKO: Buka halaman about.php
 function showStoreInfo(){
     window.location.href = 'about.php';
 }
@@ -1276,13 +1274,11 @@ function showStoreInfo(){
 
 // ── INIT ──
 document.addEventListener('DOMContentLoaded', () => {
-    // Auto-select default address
     const defaultAddr = document.querySelector('.address-card.selected');
     if(defaultAddr) {
         const idx = Array.from(document.querySelectorAll('.address-card')).indexOf(defaultAddr);
         selectAddress(idx);
     }
-    // Sync item checkboxes
     document.querySelectorAll('.item-checkbox').forEach(cb => {
         cb.addEventListener('change', updateTotal);
     });
