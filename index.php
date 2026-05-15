@@ -1,6 +1,32 @@
 <?php include 'config.php';
 include 'functions.php';
 
+// 🔥 AMBIL SETTINGS DARI DATABASE DENGAN ERROR HANDLING 🔥
+$settings = [];
+$settings_query = mysqli_query($conn, "SELECT * FROM settings WHERE id=1 LIMIT 1");
+if($settings_query && mysqli_num_rows($settings_query) > 0){
+    $settings = mysqli_fetch_assoc($settings_query);
+} else {
+    // Default values jika tidak ada data
+    $settings = [
+        'site_title' => 'Texcer Hott',
+        'hero_title' => 'ORDER MAKANAN',
+        'hero_subtitle' => 'Welcome to Texcer Hot',
+        'hero_button_text' => 'Pesan Sekarang',
+        'menu_section_title' => 'Menu',
+        'menu_section_subtitle' => 'makanan pedas',
+        'testimonials_section_title' => 'Testimoni',
+        'testimonials_section_subtitle' => 'Lihat apa kata mereka tentang Texcer Hot',
+        'location_section_title' => 'Lokasi Kami',
+        'location_section_subtitle' => 'Kunjungi Texcer Hot atau pesan online untuk pengiriman',
+        'whatsapp_number' => '6281234567890',
+        'email' => 'info@texcerhot.com',
+        'address' => 'Depan SMPN 1 Bangsri, Jepara',
+        'opening_hours' => '11:00 - 20:00 WIB',
+        'footer_about' => 'Pesan makanan pedas favoritmu sekarang!',
+        'footer_copyright' => '© 2020 - 2026 Texcer Hot'
+    ];
+}
 // Contoh di admin.php saat update status
 if(isset($_POST['update_status'])){
     $order_id = (int)$_POST['order_id'];
@@ -50,115 +76,93 @@ if(isset($_POST['add_to_cart'])){
     exit;
 }
 
-// Data Produk
-$products = [
-    // Kategori Mie
-    ['id' => 1, 'name' => 'Mie Yamin', 'price' => 9000, 'category' => 'mie', 'image' => 'assets/images/mie/yamin.png', 'description' => 'Mie yamin kering dengan bumbu khas', 'has_variant' => false],
-    ['id' => 2, 'name' => 'Mie Yamin Kuah', 'price' => 9000, 'category' => 'mie', 'image' => 'assets/images/mie/yamin_kuah.png', 'description' => 'Mie yamin dengan kuah kaldu gurih', 'has_variant' => false],
-    
-    // Kategori Mercon
-    ['id' => 3, 'name' => 'Ceker Mercon Tanpa Tulang', 'price' => 15000, 'category' => 'mercon', 'image' => 'assets/images/mercon/ceker_tnpa_tulang.jpg', 'description' => 'Ceker mercon tanpa tulang super pedas', 'has_variant' => true, 'variants' => [
-        ['name' => 'Medium (5 pcs)', 'price' => 15000],
-        ['name' => 'Large (10 pcs)', 'price' => 25000],
-        ['name' => 'Paket Nasi & 4 pcs', 'price' => 15000]
-    ]],
-    ['id' => 4, 'name' => 'Kuah Mercon', 'price' => 12000, 'category' => 'mercon', 'image' => 'assets/images/mercon/kuah_mercon.jpg', 'description' => 'Kuah mercon pedas nendang', 'has_variant' => false],
-    
-    // Kategori Dimsum
-    ['id' => 5, 'name' => 'Dimsum Udang Keju', 'price' => 12000, 'category' => 'dimsum', 'image' => 'assets/images/dimsum/udang_keju.jpg', 'description' => 'Dimsum udang dengan keju leleh (3 pcs)', 'has_variant' => false],
-    ['id' => 6, 'name' => 'Wonton Goreng/Rebus', 'price' => 10000, 'category' => 'dimsum', 'image' => 'assets/images/dimsum/wonton.jpg', 'description' => 'Wonton goreng atau rebus (3 pcs)', 'has_variant' => true, 'variants' => [
-        ['name' => 'Goreng', 'price' => 10000],
-        ['name' => 'Rebus', 'price' => 10000]
-    ]],
-    ['id' => 7, 'name' => 'Pangsit Isi Ayam', 'price' => 10000, 'category' => 'dimsum', 'image' => 'assets/images/dimsum/pangsit_ayam.jpg', 'description' => 'Pangsit isi ayam (5 pcs)', 'has_variant' => false],
-    
-    // Kategori Minuman
-    ['id' => 8, 'name' => 'Es Permen Karet', 'price' => 5000, 'category' => 'minuman', 'image' => 'assets/images/minuman/es_permen_karet.jpg', 'description' => 'Minuman es rasa permen karet yang unik', 'has_variant' => false],
-    ['id' => 9, 'name' => 'Susu', 'price' => 5000, 'category' => 'minuman', 'image' => 'assets/images/minuman/susu.jpg', 'description' => 'Susu segar', 'has_variant' => true, 'variants' => [
-        ['name' => 'Es', 'price' => 5000],
-        ['name' => 'Hangat', 'price' => 5000]
-    ]],
-    ['id' => 10, 'name' => 'Milo', 'price' => 8000, 'category' => 'minuman', 'image' => 'assets/images/minuman/milo.jpg', 'description' => 'Milo coklat malt', 'has_variant' => true, 'variants' => [
-        ['name' => 'Es', 'price' => 8000],
-        ['name' => 'Hangat', 'price' => 8000]
-    ]],
-    ['id' => 11, 'name' => 'Teh', 'price' => 3000, 'category' => 'minuman', 'image' => 'assets/images/minuman/teh.jpg', 'description' => 'Teh manis/segar', 'has_variant' => true, 'variants' => [
-        ['name' => 'Es', 'price' => 3000],
-        ['name' => 'Hangat', 'price' => 3000]
-    ]],
-    ['id' => 12, 'name' => 'Coklat', 'price' => 8000, 'category' => 'minuman', 'image' => 'assets/images/minuman/coklat.jpg', 'description' => 'Coklat panas/dingin', 'has_variant' => true, 'variants' => [
-        ['name' => 'Es', 'price' => 8000],
-        ['name' => 'Hangat', 'price' => 8000]
-    ]]
-];
+// Ambil produk dari database
+$check_col = mysqli_query($conn, "SHOW COLUMNS FROM products LIKE 'is_available'");
+$has_available = mysqli_num_rows($check_col) > 0;
+
+$where = $has_available ? "WHERE p.is_available = 1" : "";
+$joinCat = "LEFT JOIN categories c ON p.category_id = c.id";
+$selectCat = "c.name as category_name";
+
+$result = mysqli_query($conn, "SELECT p.*, {$selectCat} FROM products p $joinCat $where ORDER BY p.created_at DESC");
+
+$products = [];
+while($row = mysqli_fetch_assoc($result)){
+    $products[] = [
+        'id' => $row['id'],
+        'name' => $row['name'],
+        'price' => $row['price'],
+        'category' => $row['category_name'] ?? 'all',
+        'image' => !empty($row['image']) ? 'uploads/' . $row['image'] : '',
+        'description' => $row['description'] ?? '',
+        'has_variant' => false,
+        'variants' => []
+    ];
+}
 
 $currentPage = basename($_SERVER['PHP_SELF']);
 
-// Array untuk hero images (bisa ditambah)
-$heroImages = [
-    'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=1200',
-    'https://images.unsplash.com/photo-1612929633738-8fe44f7ec841?w=1200',
-    'https://images.unsplash.com/photo-1555126634-323283cb0025?w=1200',
-    'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200'
-];
+// Ambil hero images dari database
+$heroImages = [];
+$hero_query = mysqli_query($conn, "SELECT * FROM site_images WHERE section='hero' AND is_active=1 ORDER BY display_order");
+while($img = mysqli_fetch_assoc($hero_query)){
+    $heroImages[] = $img['image_path'];
+}
 
-// Array untuk video testimonials
-$videoTestimonials = [
-    [
-        'video' => 'assets/videos/video1.mp4',
-        'thumbnail' => 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=400',
-        'user' => 'Andi Wijaya',
-        'initial' => 'A',
-        'product' => 'Mie Pedas Level 8',
+// Fallback jika tidak ada gambar di database
+if(empty($heroImages)){
+    $heroImages = [
+        'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=1200',
+        'https://images.unsplash.com/photo-1612929633738-8fe44f7ec841?w=1200',
+        'https://images.unsplash.com/photo-1555126634-323283cb0025?w=1200',
+        'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200'
+    ];
+}
+
+// 🔥 AMBIL TESTIMONIAL DARI DATABASE 🔥
+$videoTestimonials = [];
+$testimonial_query = mysqli_query($conn, "SELECT * FROM site_images WHERE section='testimonial' AND is_active=1 ORDER BY display_order");
+
+while($t = mysqli_fetch_assoc($testimonial_query)){
+    // Generate data untuk tampilan
+    $initial = strtoupper(substr($t['title'], 0, 1));
+    
+    $videoTestimonials[] = [
+        'video' => $t['media_type'] === 'video' ? $t['video_url'] : '',
+        'image' => $t['image_path'],
+        'media_type' => $t['media_type'],
+        'thumbnail' => $t['image_path'] ?: 'https://via.placeholder.com/400x300?text=No+Image',
+        'user' => $t['title'],
+        'initial' => $initial,
+        'product' => 'Testimoni Pelanggan',
         'rating' => 5,
-        'duration' => '0:45'
-    ],
-    [
-        'video' => 'assets/videos/video2.mp4',
-        'thumbnail' => 'https://images.unsplash.com/photo-1612929633738-8fe44f7ec841?w=400',
-        'user' => 'Siti Nurhaliza',
-        'initial' => 'S',
-        'product' => 'Mercon Ayam',
-        'rating' => 5,
-        'duration' => '1:20'
-    ],
-    [
-        'video' => 'assets/videos/video3.mp4',
-        'thumbnail' => 'https://images.unsplash.com/photo-1555126634-323283cb0025?w=400',
-        'user' => 'Budi Santoso',
-        'initial' => 'B',
-        'product' => 'Dimsum Mercon',
-        'rating' => 4,
-        'duration' => '0:58'
-    ],
-    [
-        'video' => 'assets/videos/video4.mp4',
-        'thumbnail' => 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=400',
-        'user' => 'Dewi Lestari',
-        'initial' => 'D',
-        'product' => 'Mie Goreng Pedas',
-        'rating' => 5,
-        'duration' => '1:05'
-    ],
-    [
-        'video' => 'assets/videos/video5.mp4',
-        'thumbnail' => 'https://images.unsplash.com/photo-1612929633738-8fe44f7ec841?w=400',
-        'user' => 'Rudi Hartono',
-        'initial' => 'R',
-        'product' => 'Es Teh Manis',
-        'rating' => 5,
-        'duration' => '0:35'
-    ],
-    [
-        'video' => 'assets/videos/video6.mp4',
-        'thumbnail' => 'https://images.unsplash.com/photo-1555126634-323283cb0025?w=400',
-        'user' => 'Maya Angelina',
-        'initial' => 'M',
-        'product' => 'Nasi Goreng Mercon',
-        'rating' => 5,
-        'duration' => '1:15'
-    ]
-];
+        'duration' => '0:30'
+    ];
+}
+
+// Fallback jika tidak ada testimonial di database
+if(empty($videoTestimonials)){
+    $videoTestimonials = [
+        [
+            'video' => 'assets/videos/video1.mp4',
+            'thumbnail' => 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=400',
+            'user' => 'Andi Wijaya',
+            'initial' => 'A',
+            'product' => 'Mie Pedas Level 8',
+            'rating' => 5,
+            'duration' => '0:45'
+        ],
+        [
+            'video' => 'assets/videos/video2.mp4',
+            'thumbnail' => 'https://images.unsplash.com/photo-1612929633738-8fe44f7ec841?w=400',
+            'user' => 'Siti Nurhaliza',
+            'initial' => 'S',
+            'product' => 'Mercon Ayam',
+            'rating' => 5,
+            'duration' => '1:20'
+        ]
+    ];
+}
 
 // Hitung total notifikasi (contoh: pesanan baru)
 $totalNotifications = 0;
@@ -173,7 +177,7 @@ if(isset($_SESSION['user_phone'])){
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Texcer Hot - Pesan Makanan Pedas</title>
+<title><?= htmlspecialchars($settings['site_title'] ?? 'Texcer Hot') ?></title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 <style>
@@ -1216,11 +1220,9 @@ body {
     </div>
 
     <div class="hero-content">
-        <h1 class="hero-title">ORDER<br>MAKANAN</h1>
-        <p class="hero-subtitle">Welcome to Texcer Hot</p>
-        <button class="hero-btn" onclick="document.getElementById('menu').scrollIntoView({behavior: 'smooth'})">
-            <i class="fas fa-fire"></i> Pesan Sekarang
-        </button>
+        <h1 class="hero-title"><?= htmlspecialchars($settings['hero_title'] ?? 'ORDER MAKANAN') ?></h1>
+<p class="hero-subtitle"><?= htmlspecialchars($settings['hero_subtitle'] ?? 'Welcome to Texcer Hot') ?></p>>
+        <button class="hero-btn"><?= htmlspecialchars($settings['hero_button_text'] ?? 'Pesan Sekarang') ?></button>
     </div>
 
     <div class="hero-dots">
@@ -1234,12 +1236,9 @@ body {
 <section class="menu-section" id="menu">
     <div class="section-header">
         <div>
-            <h2 class="section-title">Menu</h2>
-            <p class="section-subtitle">makanan pedas</p>
+            <h2 class="section-title"><?= htmlspecialchars($settings['menu_section_title'] ?? 'Menu') ?></h2>
+<p class="section-subtitle"><?= htmlspecialchars($settings['menu_section_subtitle'] ?? 'makanan pedas') ?></p>
         </div>
-        <a href="checkout.php" class="my-basket-btn">
-            <i class="fas fa-shopping-basket"></i> My Basket
-        </a>
     </div>
 
     <!-- Category Tabs -->
@@ -1284,11 +1283,8 @@ body {
                 <h3 class="product-name"><?= $p['name'] ?></h3>
                 <p class="product-desc"><?= $p['description'] ?></p>
                 <div class="product-footer">
-                    <span class="product-price">Rp <?= number_format($p['price'], 0, ',', '.') ?></span>
-                    <button class="add-to-cart" onclick="openVariantModal(<?= $p['id'] ?>, '<?= $p['name'] ?>', <?= $p['has_variant'] ? 'true' : 'false' ?>)">
-                        <?= $p['has_variant'] ? 'Pilih Varian' : 'To Cart' ?>
-                    </button>
-                </div>
+    <span class="product-price">Rp <?= number_format($p['price'], 0, ',', '.') ?></span>
+</div>
             </div>
         </div>
         <?php endforeach; ?>
@@ -1299,11 +1295,11 @@ body {
     </div>
 </section>
 
-<!-- ✅ VIDEO TESTIMONIALS DENGAN AUTO SCROLL & VIDEO DARI FOLDER -->
+<!-- ✅ VIDEO TESTIMONIALS SECTION -->
 <section class="video-testimonials-section">
     <div class="testimonials-header">
-        <h2>Testimoni Video</h2>
-        <p>Lihat apa kata mereka tentang Texcer Hot</p>
+        <h2><?= htmlspecialchars($settings['testimonials_section_title'] ?? 'Testimoni Video') ?></h2>
+        <p><?= htmlspecialchars($settings['testimonials_section_subtitle'] ?? 'Lihat apa kata mereka tentang Texcer Hot') ?></p>
     </div>
 
     <div class="video-container">
@@ -1314,28 +1310,29 @@ body {
         <div class="video-grid" id="videoGrid">
             <?php foreach($videoTestimonials as $index => $video): ?>
             <div class="video-card" data-index="<?= $index ?>">
-                <div class="video-wrapper" onclick="toggleVideo(this, '<?= $video['video'] ?>')">
-                    <img src="<?= $video['thumbnail'] ?>" alt="<?= $video['user'] ?>" class="video-thumbnail">
-                    <video src="<?= $video['video'] ?>" loop muted playsinline></video>
-                    <div class="video-overlay">
-                        <div class="video-play-btn">
-                            <i class="fas fa-play"></i>
+                <div class="video-wrapper" onclick="<?= !empty($video['video']) ? "toggleVideo(this, '".htmlspecialchars($video['video'])."')" : "void(0)" ?>">
+                    
+                    <?php if($video['media_type'] === 'video' && !empty($video['video'])): ?>
+                        <img src="<?= htmlspecialchars($video['thumbnail']) ?>" alt="<?= htmlspecialchars($video['user']) ?>" class="video-thumbnail">
+                        <video src="<?= htmlspecialchars($video['video']) ?>" loop muted playsinline></video>
+                        <div class="video-overlay">
+                            <div class="video-play-btn"><i class="fas fa-play"></i></div>
                         </div>
-                    </div>
-                    <span class="video-duration"><?= $video['duration'] ?></span>
+                        <span class="video-duration"><i class="fas fa-video me-1"></i>Video</span>
+                    <?php else: ?>
+                        <img src="<?= htmlspecialchars($video['thumbnail']) ?>" alt="<?= htmlspecialchars($video['user']) ?>" class="video-thumbnail" style="cursor: default;">
+                    <?php endif; ?>
+                    
                 </div>
                 <div class="video-info">
                     <div class="video-user">
                         <div class="user-avatar" style="background: <?= $index % 3 == 0 ? 'var(--accent)' : ($index % 3 == 1 ? '#D4A574' : '#E8B4A2') ?>;"><?= $video['initial'] ?></div>
-                        <span class="user-name"><?= $video['user'] ?></span>
+                        <span class="user-name"><?= htmlspecialchars($video['user']) ?></span>
                     </div>
-                    <div class="video-product"><?= $video['product'] ?></div>
+                    <div class="video-product"><?= htmlspecialchars($video['product']) ?></div>
                     <div class="video-rating">
-                        <?php for($i = 0; $i < $video['rating']; $i++): ?>
+                        <?php for($i = 0; $i < ($video['rating'] ?? 5); $i++): ?>
                         <i class="fas fa-star"></i>
-                        <?php endfor; ?>
-                        <?php for($i = $video['rating']; $i < 5; $i++): ?>
-                        <i class="far fa-star"></i>
                         <?php endfor; ?>
                     </div>
                 </div>
@@ -1349,12 +1346,13 @@ body {
     </div>
 </section>
 
+
 <!-- ✅ LOKASI KAMI (GOOGLE MAPS) -->
 <section class="location-section">
     <div class="container">
         <div class="location-header">
-            <h2><i class="fas fa-map-marker-alt"></i> Lokasi Kami</h2>
-            <p>Kunjungi Texcer Hot atau pesan online untuk pengiriman</p>
+           <h2><i class="fas fa-map-marker-alt"></i> <?= htmlspecialchars($settings['location_section_title'] ?? 'Lokasi Kami') ?></h2>
+<p><?= htmlspecialchars($settings['location_section_subtitle'] ?? 'Kunjungi Texcer Hot atau pesan online untuk pengiriman') ?></p>
         </div>
 
         <div class="location-grid">
@@ -1414,11 +1412,17 @@ body {
                 </div>
 
                 <div class="action-buttons">
-                    <a href="https://wa.me/6281934174198" target="_blank" class="btn-wa">
-                        <i class="fab fa-whatsapp"></i> Chat WhatsApp
+                    <a href="#" onclick="chatWhatsApp(<?= $product['id'] ?? 'null' ?>, '<?= addslashes($product['name'] ?? '') ?>'); return false;" class="btn-wa">
+                    <i class="fab fa-whatsapp"></i> Chat WhatsApp
                     </a>
-                    <a href="https://goo.gl/maps/YourMapLink" target="_blank" class="btn-directions">
-                        <i class="fas fa-directions"></i> Petunjuk Arah
+
+                    <button type="button" onclick="showStoreInfo()" style="background: none; border: none; cursor: pointer; padding: 8px;">
+    <i class="fas fa-store"></i>
+    <div style="font-size: 0.75rem; margin-top: 2px;">Toko</div>
+</button>
+
+                    <a href="https://www.google.com/maps/place/Texcer+Hot+Cabang+Bangsri/@-6.523646,110.7668596,17z/data=!4m6!3m5!1s0x0:0x0!8m2!3d-6.523646052367316!4d110.7668596153108!16s%2Fg%2F11abc123xyz?entry=ttu" target="_blank" class="btn-directions">
+                    <i class="fas fa-directions"></i> Petunjuk Arah
                     </a>
                 </div>
             </div>
@@ -1621,11 +1625,118 @@ body {
 </style>
 <script>
 // 🔥 GANTI MOCKDATA DENGAN AJAX CALL 🔥
-fetch('api/track_order.php', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({query: input})
-})
+// 🔥 TRACKING ORDER FUNCTION
+function trackOrder() {
+    const input = document.getElementById('trackingInput');
+    if(!input) return; // Exit if element not found
+    
+    const query = input.value.trim();
+    if(!query) {
+        alert('Masukkan nomor pesanan');
+        return;
+    }
+    
+    fetch('api/track_order.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({query: query})
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success && data.order) {
+            const order = data.order;
+            // Update UI dengan data dari database
+            const orderId = document.getElementById('orderId');
+            const orderStatus = document.getElementById('orderStatus');
+            const customerName = document.getElementById('customerName');
+            const customerPhone = document.getElementById('customerPhone');
+            const deliveryAddress = document.getElementById('deliveryAddress');
+            const orderItems = document.getElementById('orderItems');
+            const resiNumber = document.getElementById('resiNumber');
+            
+            if(orderId) orderId.textContent = order.id;
+            if(orderStatus) {
+                orderStatus.textContent = order.status;
+                orderStatus.className = 'status-badge status-' + order.status.toLowerCase().replace(' ', '-');
+            }
+            if(customerName) customerName.textContent = order.customer_name;
+            if(customerPhone) customerPhone.textContent = order.customer_phone;
+            if(deliveryAddress) deliveryAddress.textContent = order.customer_address || '-';
+            if(orderItems) orderItems.textContent = order.items || '-';
+            if(resiNumber) resiNumber.textContent = order.resi_number || '-';
+            
+            // Update dates
+            for (let i = 1; i <= 5; i++) {
+                const dateEl = document.getElementById('date' + i);
+                const dateKey = ['date_received', 'date_processed', 'date_shipped', 'date_delivered', 'date_completed'][i-1];
+                if(dateEl) dateEl.textContent = order[dateKey] || '-';
+            }
+            
+            const estimatedDate = document.getElementById('estimatedDate');
+            if(estimatedDate) estimatedDate.textContent = order.estimated_delivery || '-';
+            
+            // Reset semua step
+            for (let i = 1; i <= 5; i++) {
+                const step = document.getElementById('step' + i);
+                if(step) {
+                    step.classList.remove('completed', 'active');
+                }
+            }
+            
+            // Set step yang sesuai
+            const stepMap = {
+                'Menunggu Konfirmasi': 1,
+                'Diproses': 2,
+                'Dikemas': 2,
+                'Dikirim': 3,
+                'Diantar': 4,
+                'Selesai': 5,
+                'Dibatalkan': 0
+            };
+            const currentStep = stepMap[order.status] || 1;
+            
+            for (let i = 1; i <= currentStep; i++) {
+                const step = document.getElementById('step' + i);
+                if(step) {
+                    if (i < currentStep) {
+                        step.classList.add('completed');
+                    } else {
+                        step.classList.add('active');
+                    }
+                }
+            }
+            
+            const noResultDiv = document.getElementById('noResult');
+            const resultDiv = document.getElementById('result');
+            if(noResultDiv) noResultDiv.style.display = 'none';
+            if(resultDiv) {
+                resultDiv.style.display = 'block';
+                resultDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        } else {
+            const noResultDiv = document.getElementById('noResult');
+            const resultDiv = document.getElementById('result');
+            if(resultDiv) resultDiv.style.display = 'none';
+            if(noResultDiv) noResultDiv.style.display = 'block';
+        }
+    })
+    .catch(err => {
+        console.error('Error:', err);
+        alert('Terjadi kesalahan saat melacak pesanan');
+    });
+}
+
+// Allow Enter key to trigger search
+document.addEventListener('DOMContentLoaded', function() {
+    const trackingInput = document.getElementById('trackingInput');
+    if(trackingInput) {
+        trackingInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                trackOrder();
+            }
+        });
+    }
+});
 .then(res => res.json())
 .then(data => {
     if (data.success && data.order) {
@@ -1701,7 +1812,7 @@ document.getElementById('trackingInput')?.addEventListener('keypress', function(
         <!-- Kolom Brand -->
         <div class="footer-section">
             <h3>Texcer Hot</h3>
-            <p>Pesan makanan pedas favoritmu sekarang! Kualitas terbaik, rasa autentik, dan pengiriman cepat ke tempatmu.</p>
+            <p><?= htmlspecialchars($settings['footer_about'] ?? 'Pesan makanan pedas favoritmu...') ?></p>
            <div class="social-links">
 
     <!-- Instagram — ganti username sesuai akun Texcer Hot -->
@@ -1775,26 +1886,26 @@ document.getElementById('trackingInput')?.addEventListener('keypress', function(
             <h4>Kontak</h4>
             <a href="#">
                 <svg viewBox="0 0 24 24"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                Depan SMPN 1 Bangsri, Jepara
+                <p><?= htmlspecialchars($settings['address'] ?? 'Depan SMPN 1 Bangsri, Jepara') ?></p>
             </a>
             <a href="#">
                 <svg viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-                +62 819-3417-4198
+                <p><?= htmlspecialchars($settings['whatsapp_number'] ?? '+62 819-3417-4198') ?></p>
             </a>
             <a href="#">
                 <svg viewBox="0 0 24 24"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                info@texcerhot.com
+                <p><?= htmlspecialchars($settings['email'] ?? 'info@texcerhot.com') ?></p>
             </a>
             <a href="#">
                 <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                Buka: 11.00 – 20.00 WIB
+                <p><?= htmlspecialchars($settings['opening_hours'] ?? '11:00 - 20:00 WIB') ?></p>
             </a>
         </div>
 
     </div>
 
     <div class="footer-bottom">
-        <p>© 2020 – <?= date('Y') ?> <strong>Texcer Hot</strong>. Berdiri sejak 2020.</p>
+        <p><?= htmlspecialchars($settings['footer_copyright'] ?? '© 2020 - 2026 Texcer Hot') ?></p>
         <p>Didirikan oleh <strong>Ahmad Amrullah Baharuddin</strong> · All rights reserved.</p>
     </div>
 </footer>
@@ -1821,41 +1932,43 @@ document.getElementById('trackingInput')?.addEventListener('keypress', function(
                 
                 <!-- Product Image Slider -->
                 <div style="position: relative; background: white;">
-                    <img src="" id="md-img" class="img-fluid" style="width: 100%; max-height: 400px; object-fit: cover;">
-                    <span style="position: absolute; bottom: 12px; right: 12px; background: rgba(0,0,0,0.6); color: white; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem;">1/9</span>
+                    <img src="" id="md-img" class="img-fluid" 
+                    style="width: 100%; max-height: 400px; object-fit: cover;"
+                    onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22400%22%3E%3Crect fill=%22%23ddd%22 width=%22400%22 height=%22400%22/%3E%3Ctext fill=%22%23999%22 x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dy=%22.3em%22%3EGambar Tidak Tersedia%3C/text%3E%3C/svg%3E'">
+                    <span style="position: absolute; bottom: 12px; right: 12px; background: rgba(0,0,0,0.6); color: white; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem;">1/1</span>
                 </div>
 
-                <!-- Flash Sale Banner -->
-                <div style="background: linear-gradient(135deg, #FF5858 0%, #FF8A8A 100%); padding: 12px 16px; color: white;">
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <div>
-                            <span style="background: white; color: #FF5858; padding: 2px 8px; border-radius: 4px; font-weight: 700; font-size: 0.85rem; margin-right: 8px;">-58%</span>
-                            <span style="font-weight: 600;">Mulai <span id="md-price-flash" style="font-size: 1.3rem; font-weight: 800;"></span></span>
-                        </div>
-                        <div style="text-align: right;">
-                            <div style="display: flex; align-items: center; gap: 6px;">
-                                <i class="fas fa-bolt" style="color: #FFD700;"></i>
-                                <span style="font-weight: 700;">Flash Sale</span>
-                            </div>
-                            <div style="font-size: 0.8rem; opacity: 0.9;">Berakhir dalam 07:04:20</div>
-                        </div>
-                    </div>
-                </div>
+<!-- Flash Sale Banner -->
+<div style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); padding: 12px 16px; color: white;">
+    <div style="display: flex; align-items: center; justify-content: space-between;">
+        <div>
+            <span style="background: white; color: var(--primary); padding: 2px 8px; border-radius: 4px; font-weight: 700; font-size: 0.85rem; margin-right: 8px;">-58%</span>
+            <span style="font-weight: 600;">Mulai <span id="md-price-flash" style="font-size: 1.3rem; font-weight: 800;"></span></span>
+        </div>
+        <div style="text-align: right;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+                <i class="fas fa-bolt" style="color: #FFD700;"></i>
+                <span style="font-weight: 700;">Flash Sale</span>
+            </div>
+            <div style="font-size: 0.8rem; opacity: 0.9;">Berakhir dalam 07:04:20</div>
+        </div>
+    </div>
+</div>
 
                 <!-- PayLater Info -->
                 <div style="padding: 12px 16px; border-bottom: 1px solid #f0f0f0;">
                     <div style="font-size: 0.85rem; color: #666;">
-                        <i class="fas fa-credit-card" style="color: #00B14F; margin-right: 6px;"></i>
-                        PayLater dari Rp<span id="md-paylater">0</span>/bln | <span style="color: #FF5858;">Limit 50jt</span>
+                        <i class="fas fa-credit-card" style="color: #6d5236; margin-right: 6px;"></i>
+                        PayLater dari Rp<span id="md-paylater">0</span>/bln | <span style="background: rgba(139,111,78,0.1); color: var(--primary); padding: 2px 8px; border-radius: 4px; font-size: 0.8rem;">Aktifkan batas kredit hingga Rp50 JT</span>
                         <i class="fas fa-chevron-right" style="float: right; color: #999;"></i>
                     </div>
                 </div>
 
                 <!-- Discount Badge -->
-                <div style="padding: 8px 16px; background: #FFF0F0;">
-                    <span style="background: #FFE0E0; color: #FF5858; padding: 2px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: 600;">
-                        <i class="fas fa-tag" style="margin-right: 4px;"></i>Diskon Rp15rb
-                    </span>
+                <div style="padding: 8px 16px; background: rgba(139,111,78,0.1);">
+                <span style="background: rgba(139,111,78,0.2); color: var(--primary); padding: 2px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: 600;">
+                <i class="fas fa-tag" style="margin-right: 4px;"></i>Diskon Rp15rb
+                </span>
                 </div>
 
                 <!-- Product Name & Rating -->
@@ -1876,9 +1989,9 @@ document.getElementById('trackingInput')?.addEventListener('keypress', function(
                 <!-- Shipping Info -->
                 <div style="padding: 12px 16px; border-bottom: 1px solid #f0f0f0;">
                     <div style="display: flex; align-items: flex-start; gap: 8px; font-size: 0.9rem;">
-                        <i class="fas fa-truck" style="color: #00B14F; margin-top: 3px;"></i>
+                       <i class="fas fa-truck" style="color: var(--primary); margin-top: 3px;"></i>
                         <div style="flex: 1;">
-                            <span style="background: #E0F7FA; color: #00838F; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem;">Pengiriman gratis</span>
+                            <span style="background: rgba(139,111,78,0.15); color: var(--primary); padding: 2px 6px; border-radius: 4px; font-size: 0.8rem;">Pengiriman gratis</span>
                             <span style="color: #333; margin-left: 6px;">Dijamin tiba paling lambat pada 14-16 Mei</span>
                         </div>
                     </div>
@@ -1909,32 +2022,32 @@ document.getElementById('trackingInput')?.addEventListener('keypress', function(
                     </div>
                 </div>
 
-                <!-- Voucher & Promo -->
-                <div style="padding: 16px; border-bottom: 1px solid #f0f0f0;">
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-                        <h4 style="font-size: 1.1rem; font-weight: 600; margin: 0;">Voucher & Promo</h4>
-                        <i class="fas fa-chevron-right" style="color: #999;"></i>
-                    </div>
-                    <div style="display: flex; gap: 12px; overflow-x: auto;">
-                        <div style="background: #F0FDF4; border: 1px solid #00B14F; border-radius: 8px; padding: 12px; min-width: 280px; flex-shrink: 0;">
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <i class="fas fa-truck" style="color: #00B14F; font-size: 1.5rem;"></i>
-                                <div style="flex: 1;">
-                                    <div style="font-weight: 700; color: #00838F; font-size: 1.1rem;">Diskon Rp30rb</div>
-                                    <div style="font-size: 0.8rem; color: #666;">untuk pesanan di atas Rp20rb</div>
-                                </div>
-                                <button style="background: white; border: 1px solid #00B14F; color: #00B14F; padding: 6px 16px; border-radius: 20px; font-weight: 600; font-size: 0.85rem;">Gunakan</button>
-                            </div>
-                        </div>
-                    </div>
+ <!-- Voucher & Promo -->
+<div style="padding: 16px; border-bottom: 1px solid #f0f0f0;">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+        <h4 style="font-size: 1.1rem; font-weight: 600; margin: 0;">Voucher & Promo</h4>
+        <i class="fas fa-chevron-right" style="color: #999;"></i>
+    </div>
+    <div style="display: flex; gap: 12px; overflow-x: auto;">
+        <div style="background: rgba(139,111,78,0.05); border: 1px solid var(--primary); border-radius: 8px; padding: 12px; min-width: 280px; flex-shrink: 0;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-truck" style="color: var(--primary); font-size: 1.5rem;"></i>
+                <div style="flex: 1;">
+                    <div style="font-weight: 700; color: var(--primary); font-size: 1.1rem;">Diskon Rp30rb</div>
+                    <div style="font-size: 0.8rem; color: #666;">untuk pesanan di atas Rp20rb</div>
                 </div>
+                <button style="background: var(--primary); border: 1px solid var(--primary); color: white; padding: 6px 16px; border-radius: 20px; font-weight: 600; font-size: 0.85rem;">Gunakan</button>
+            </div>
+        </div>
+    </div>
+</div>
 
                 <!-- PayLater Section -->
                 <div style="padding: 16px; border-bottom: 1px solid #f0f0f0;">
                     <div style="display: flex; align-items: center; justify-content: space-between;">
                         <div>
                             <h4 style="font-size: 1.1rem; font-weight: 600; margin: 0 0 4px 0;">PayLater</h4>
-                            <span style="background: #FFF0F0; color: #FF5858; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem;">Aktifkan batas kredit hingga Rp50 JT</span>
+                            <i class="fas fa-credit-card" style="color: var(--primary); margin-right: 6px;"></i>
                         </div>
                         <i class="fas fa-chevron-right" style="color: #999;"></i>
                     </div>
@@ -1977,12 +2090,12 @@ document.getElementById('trackingInput')?.addEventListener('keypress', function(
                             <i class="fas fa-store" style="font-size: 1.5rem; color: #999;"></i>
                         </div>
                         <div style="flex: 1;">
-                            <div style="font-weight: 600; font-size: 1rem;">MY AKSA Indonesia</div>
+                            <div style="font-weight: 600; font-size: 1rem;">Texcer Hot</div>
                             <div style="font-size: 0.85rem; color: #666;">
-                                <i class="fas fa-star" style="color: #00B14F;"></i> 3.6 &nbsp; 24.6K terjual
+                                <i class="fas fa-star" style="color: #ffd500;"></i> 3.6 &nbsp; 24.6K terjual
                             </div>
                         </div>
-                        <button style="background: #f0f0f0; border: none; padding: 8px 16px; border-radius: 20px; font-weight: 600; color: #333;">Kunjungi</button>
+                        <button onclick="showStoreProfile()" style="background: var(--primary); border: none; padding: 8px 16px; border-radius: 20px; font-weight: 600; color: white; cursor: pointer;">Kunjungi</button>
                     </div>
                     <div style="margin-top: 12px; font-size: 0.85rem; color: #666;">
                         <span>100% merespons dalam 24j</span> &nbsp; 
@@ -2001,24 +2114,93 @@ document.getElementById('trackingInput')?.addEventListener('keypress', function(
                 </div>
             </div>
 
-            <!-- Bottom Action Bar -->
-            <div class="modal-footer" style="border-top: 1px solid #e0e0e0; padding: 12px 16px; background: white; position: sticky; bottom: 0;">
-                <button class="btn btn-link" style="text-decoration: none; color: #333; padding: 8px;">
-                    <i class="fas fa-store" style="display: block; font-size: 1.2rem;"></i>
-                    <span style="font-size: 0.75rem;">Toko</span>
-                </button>
-                <button class="btn btn-link" style="text-decoration: none; color: #333; padding: 8px;">
-                    <i class="fas fa-comment" style="display: block; font-size: 1.2rem;"></i>
-                    <span style="font-size: 0.75rem;">Chat</span>
-                </button>
-                <button class="btn" style="background: #f0f0f0; border-radius: 50%; width: 48px; height: 48px; padding: 0; display: flex; align-items: center; justify-content: center; margin: 0 8px;">
-                    <i class="fas fa-shopping-cart" style="color: #00B14F; font-size: 1.3rem;"></i>
-                </button>
-                <button type="submit" form="modalFormPesan" class="btn" style="background: #00B14F; color: white; border-radius: 24px; padding: 12px 32px; font-weight: 600; flex: 1; max-width: 200px;">
-                    <div style="font-size: 1rem;">Beli sekarang</div>
-                    <div style="font-size: 0.85rem; opacity: 0.9;"><span id="md-price-bottom"></span> | Pengiriman gratis</div>
-                </button>
+            <!-- ✅ PROFIL TOKO (Awalnya disembunyikan) -->
+<div id="storeProfileContent" style="display: none;">
+    <!-- Cover Foto Toko -->
+    <div style="width: 100%; height: 200px; background-color: #eee; position: relative;">
+        <img src="assets/images/logo-texcer.png" style="width:100%; height:100%; object-fit: cover;">
+        <!-- Tombol Back -->
+        <button onclick="backToProduct()" style="position: absolute; top: 15px; left: 15px; background: white; border: none; width: 40px; height: 40px; border-radius: 50%; box-shadow: 0 2px 5px rgba(0,0,0,0.2); cursor: pointer; display:flex; align-items:center; justify-content:center;">
+            <i class="fas fa-arrow-left" style="color: var(--primary);"></i>
+        </button>
+    </div>
+
+    <div style="padding: 20px;">
+        <!-- Logo & Nama Toko -->
+        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+            <div style="width: 60px; height: 60px; border-radius: 50%; background: #eee; overflow: hidden; border: 2px solid var(--primary);">
+                <img src="assets/images/logo-texcer.png" style="width:100%; height:100%; object-fit: cover;">
             </div>
+            <div>
+                <h3 style="margin: 0; font-size: 1.3rem; font-weight: 700;">Texcer Hot</h3>
+                <p style="margin: 2px 0 0; color: var(--text-gray); font-size: 0.85rem;">
+                    <i class="fas fa-star" style="color: #ffd500;"></i> 4.8 (100+ Rating) &nbsp;|&nbsp; Online
+                </p>
+            </div>
+        </div>
+
+        <!-- Deskripsi Toko -->
+        <div style="background: var(--bg-cream); padding: 15px; border-radius: 12px; margin-bottom: 20px;">
+            <h5 style="margin: 0 0 8px; font-size: 1rem;">Tentang Toko</h5>
+            <p style="margin: 0; font-size: 0.9rem; color: var(--text-gray); line-height: 1.5;">
+                Texcer Hot Cabang Bangsri - Pusat kuliner pedas dan nikmat di Jepara. 
+                Kami menyediakan Mie Yamin, Dimsum, dan Minuman segar. 
+                Dibuka sejak 2020 dengan resep turun temurun.
+            </p>
+        </div>
+
+        <!-- Info Lokasi -->
+        <div style="margin-bottom: 20px;">
+            <h5 style="font-size: 1rem; margin-bottom: 10px;">Lokasi & Jam Buka</h5>
+            <p style="font-size: 0.9rem; margin: 5px 0; color: var(--text-gray);">
+                <i class="fas fa-map-marker-alt" style="width: 20px; color: var(--primary);"></i> Depan SMPN 1 Bangsri, Jepara
+            </p>
+            <p style="font-size: 0.9rem; margin: 5px 0; color: var(--text-gray);">
+                <i class="fas fa-clock" style="width: 20px; color: var(--primary);"></i> Buka: 11.00 - 20.00 WIB
+            </p>
+        </div>
+
+        <!-- Tombol Aksi -->
+        <div style="display: flex; gap: 10px;">
+            <a href="https://wa.me/6281934174198" target="_blank" style="flex: 1; padding: 12px; background: #25D366; color: white; text-decoration: none; text-align: center; border-radius: 20px; font-weight: 600;">
+                <i class="fab fa-whatsapp"></i> Chat Admin
+            </a>
+            <a href="https://www.google.com/maps/dir/Current+Location/-6.523646052367316,110.7668596153108" target="_blank" style="flex: 1; padding: 12px; background: var(--primary); color: white; text-decoration: none; text-align: center; border-radius: 20px; font-weight: 600;">
+                <i class="fas fa-map"></i> Petunjuk Arah
+            </a>
+        </div>
+    </div>
+</div>
+
+          <!-- Bottom Action Bar -->
+<div class="modal-footer" style="border-top: 1px solid #e0e0e0; padding: 12px 16px; background: white; position: sticky; bottom: 0;">
+    <button class="btn btn-link" style="text-decoration: none; color: #333; padding: 8px;" onclick="alert('Fitur toko segera hadir!')">
+        <i class="fas fa-store" style="display: block; font-size: 1.2rem;"></i>
+        <span style="font-size: 0.75rem;">Toko</span>
+    </button>
+    <button type="button" onclick="chatWhatsApp(<?= $product['id'] ?>, '<?= addslashes($product['name']) ?>')" style="background: none; border: none; cursor: pointer; padding: 8px;">
+    <i class="fas fa-comments"></i>
+    <div style="font-size: 0.75rem; margin-top: 2px;">Chat</div>
+    </button>
+    
+    <!-- ✅ Form untuk Add to Cart dari Modal Detail -->
+    <form method="POST" id="modalFormPesan" action="index.php" style="display: contents;">
+        <input type="hidden" name="id" id="modal-product-id">
+        <input type="hidden" name="name" id="modal-product-name">
+        <input type="hidden" name="price" id="modal-product-price">
+        <input type="hidden" name="variant" value="">
+        <input type="hidden" name="add_to_cart" value="1">
+        
+        <button type="button" class="btn" style="background: #f0f0f0; border-radius: 50%; width: 48px; height: 48px; padding: 0; display: flex; align-items: center; justify-content: center; margin: 0 8px;" onclick="addToCartFromModal()">
+            <i class="fas fa-shopping-cart" style="color: #00B14F; font-size: 1.3rem;"></i>
+        </button>
+        
+        <button type="button" id="btnBeliSekarang" onclick="buyNowFromModal()" style="background: #00B14F; color: white; border: none; border-radius: 24px; padding: 12px 32px; font-weight: 600; cursor: pointer;">
+    <div style="font-size: 1rem;">Beli sekarang</div>
+    <div style="font-size: 0.85rem; opacity: 0.9;"><span id="md-price-bottom">Rp 0</span> | Pengiriman gratis</div>
+</button>
+    </form>
+</div>
         </div>
     </div>
 </div>
@@ -2040,8 +2222,9 @@ document.getElementById('trackingInput')?.addEventListener('keypress', function(
                     <input type="hidden" name="name" id="mv-name">
                     <input type="hidden" name="price" id="mv-price">
                     <input type="hidden" name="variant" id="mv-variant">
-                    <button type="submit" name="add_to_cart" class="btn w-100 py-3 mt-3 fw-bold" style="border-radius: 50px; background: var(--primary); color: white; border: none; font-size: 1.1rem;" id="btnAddToCart">
-                        <i class="fas fa-shopping-cart me-2"></i> Tambah ke Keranjang
+                    <button type="button" onclick="addToCart(<?= $product['id'] ?>, document.getElementById('variantSelect')?.value || '')" style="background: none; border: none; cursor: pointer; padding: 8px;">
+                    <i class="fas fa-shopping-cart"></i>
+                    <div style="font-size: 0.75rem; margin-top: 2px;">Tambah Keranjang</div>
                     </button>
                 </form>
             </div>
@@ -2130,10 +2313,13 @@ function toggleFavorite(btn, event) {
 var modal = document.getElementById('modalDetail');
 modal.addEventListener('show.bs.modal', function (event) {
     var button = event.relatedTarget;
+    var imgSrc = button.getAttribute('data-img');
+    
+    // Set image dengan fallback
+    document.getElementById('md-img').src = imgSrc || 'assets/images/placeholder.png';
     document.getElementById('md-name').innerText = button.getAttribute('data-name');
     document.getElementById('md-price').innerText = "Rp " + parseInt(button.getAttribute('data-price')).toLocaleString('id-ID');
-    document.getElementById('md-desc').innerText = button.getAttribute('data-desc');
-    document.getElementById('md-img').src = button.getAttribute('data-img');
+    document.getElementById('md-desc').innerText = button.getAttribute('data-desc') || '';
     document.getElementById('md-id').value = button.getAttribute('data-id');
     document.getElementById('md-form-name').value = button.getAttribute('data-name');
     document.getElementById('md-form-price').value = button.getAttribute('data-price');
@@ -2290,12 +2476,229 @@ function showNotifications() {
     // Implementasi notifikasi yang lebih kompleks bisa ditambahkan di sini
 }
 
+// ✅ Fungsi Add to Cart dari Modal Detail
+function addToCartFromModal() {
+    const productId = document.getElementById('modal-product-id').value;
+    const productName = document.getElementById('modal-product-name').value;
+    const productPrice = document.getElementById('modal-product-price').value;
+    
+    if(!productId || !productName) {
+        alert('Mohon pilih produk terlebih dahulu');
+        return;
+    }
+    
+    // Submit form
+    document.getElementById('modalFormPesan').submit();
+}
+
+// ✅ Fungsi Buy Now dari Modal Detail
+function buyNowFromModal() {
+    const productId = document.getElementById('modal-product-id').value;
+    const productName = document.getElementById('modal-product-name').value;
+    const productPrice = document.getElementById('modal-product-price').value;
+    
+    if(!productId || !productName) {
+        alert('Mohon pilih produk terlebih dahulu');
+        return;
+    }
+    
+    // Tambah ke cart dulu
+    addToCartFromModal();
+    
+    // Redirect ke checkout
+    setTimeout(() => {
+        window.location.href = 'checkout.php';
+    }, 500);
+}
+
+// ✅ Update hidden form values saat modal dibuka
+var modal = document.getElementById('modalDetail');
+modal.addEventListener('show.bs.modal', function (event) {
+    var button = event.relatedTarget;
+    
+    // Update text content (dengan pengecekan null)
+const mdName = document.getElementById('md-name');
+const mdPrice = document.getElementById('md-price');
+const mdPriceBottom = document.getElementById('md-price-bottom');
+const mdDesc = document.getElementById('md-desc');
+
+if(mdName) mdName.innerText = button.getAttribute('data-name');
+if(mdPrice) mdPrice.innerText = "Rp " + parseInt(button.getAttribute('data-price')).toLocaleString('id-ID');
+if(mdPriceBottom) mdPriceBottom.innerText = "Rp " + parseInt(button.getAttribute('data-price')).toLocaleString('id-ID');
+if(mdDesc) mdDesc.innerText = button.getAttribute('data-desc');
+    
+    // ✅ Update hidden form values untuk add to cart
+    document.getElementById('modal-product-id').value = button.getAttribute('data-id');
+    document.getElementById('modal-product-name').value = button.getAttribute('data-name');
+    document.getElementById('modal-product-price').value = button.getAttribute('data-price');
+    
+    // Set gambar dengan error handling
+    var imgSrc = button.getAttribute('data-img');
+    var modalImg = document.getElementById('md-img');
+    
+    if(imgSrc && imgSrc !== ''){
+        modalImg.src = imgSrc;
+        modalImg.onerror = function() {
+            this.src = 'assets/images/placeholder.png';
+        };
+        modalImg.style.display = 'block';
+    } else {
+        modalImg.src = 'assets/images/placeholder.png';
+    }
+    
+    // Update form variant jika ada
+    if(document.getElementById('md-id')) document.getElementById('md-id').value = button.getAttribute('data-id');
+    if(document.getElementById('md-form-name')) document.getElementById('md-form-name').value = button.getAttribute('data-name');
+    if(document.getElementById('md-form-price')) document.getElementById('md-form-price').value = button.getAttribute('data-price');
+});
+
 // Show success message if added to cart
 <?php if(isset($_GET['added']) && $_GET['added'] == '1'): ?>
 setTimeout(() => {
     alert('Produk berhasil ditambahkan ke keranjang!');
 }, 500);
 <?php endif; ?>
+
+// Fungsi untuk tombol "Kunjungi" dan "Toko"
+function visitStore() {
+    // Redirect ke halaman toko/profile penjual
+    window.open('https://wa.me/6281934174198?text=Halo%20Texcer%20Hot,%20saya%20tertarik%20dengan%20produk%20Anda', '_blank');
+}
+
+// Fungsi untuk tombol "Chat"
+function openChat() {
+    // Buka WhatsApp chat
+    const phone = '6281934174198';
+    const message = 'Halo Texcer Hot, saya mau tanya-tanya tentang produknya';
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
+}
+
+// Fungsi untuk tombol keranjang
+function addToCartFromModal() {
+    const productId = document.getElementById('md-id').value;
+    const productName = document.getElementById('md-form-name').value;
+    const productPrice = document.getElementById('md-form-price').value;
+    
+    // Kirim ke server untuk add to cart
+    fetch('add_to_cart.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `id=${productId}&name=${encodeURIComponent(productName)}&price=${productPrice}&qty=1`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if(data.success) {
+            alert('Produk berhasil ditambahkan ke keranjang!');
+            // Update cart count
+            location.reload();
+        } else {
+            alert('Gagal menambahkan ke keranjang');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        // Fallback: redirect ke checkout dengan session
+        window.location.href = 'checkout.php?added=1';
+    });
+}
+
+// Fungsi untuk tombol "Beli Sekarang"
+function buyNow() {
+    const productId = document.getElementById('md-id').value;
+    const productName = document.getElementById('md-form-name').value;
+    const productPrice = document.getElementById('md-form-price').value;
+    
+    // Langsung ke checkout
+    window.location.href = `checkout.php?buy_now=1&id=${productId}&name=${encodeURIComponent(productName)}&price=${productPrice}&qty=1`;
+}
+
+// Fungsi Tampilkan Profil Toko
+function showStoreProfile() {
+    // Sembunyikan semua isi modal body (detail produk)
+    var modalBody = document.querySelector('#modalDetail .modal-body');
+    var children = modalBody.children;
+    for(var i = 0; i < children.length; i++){
+        if(children[i].id !== 'storeProfileContent'){
+            children[i].style.display = 'none';
+        }
+    }
+    // Tampilkan profil toko
+    document.getElementById('storeProfileContent').style.display = 'block';
+    modalBody.scrollTop = 0;
+}
+
+// Fungsi Kembali ke Produk
+function backToProduct() {
+    // Sembunyikan profil toko
+    document.getElementById('storeProfileContent').style.display = 'none';
+    
+    // Tampilkan kembali semua isi modal body
+    var modalBody = document.querySelector('#modalDetail .modal-body');
+    var children = modalBody.children;
+    for(var i = 0; i < children.length; i++){
+        if(children[i].id !== 'storeProfileContent'){
+            children[i].style.display = 'block';
+        }
+    }
+    modalBody.scrollTop = 0;
+}
+// ==================== FITUR TEXCER HOT ====================
+
+// 🔥 BELI SEKARANG
+function buyNow(productId, variant = ''){
+    console.log('Beli Sekarang - Product ID:', productId);
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = 'cart.php';
+    form.innerHTML = `
+        <input type="hidden" name="add_to_cart" value="1">
+        <input type="hidden" name="product_id" value="${productId}">
+        <input type="hidden" name="quantity" value="1">
+        <input type="hidden" name="variant" value="${variant}">
+        <input type="hidden" name="redirect" value="checkout">
+    `;
+    document.body.appendChild(form);
+    form.submit();
+}
+
+// 🛒 TAMBAH KE KERANJANG
+function addToCart(productId, variant = ''){
+    console.log('Add to Cart - Product ID:', productId);
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = 'cart.php';
+    form.innerHTML = `
+        <input type="hidden" name="add_to_cart" value="1">
+        <input type="hidden" name="product_id" value="${productId}">
+        <input type="hidden" name="quantity" value="1">
+        <input type="hidden" name="variant" value="${variant}">
+    `;
+    document.body.appendChild(form);
+    form.submit();
+}
+
+// 💬 CHAT WHATSAPP
+function chatWhatsApp(productId, productName){
+    console.log('Chat WhatsApp - Product:', productName);
+    const phone = '6281934174198'; // Nomor WA kamu
+    let message = 'Halo Texcer Hot 👋\n\n';
+    message += `Saya tertarik dengan: *${productName}*\n`;
+    message += `Mohon info lebih lanjut.\n\n`;
+    message += `Terima kasih! 🙏`;
+    
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+}
+
+// 🏪 INFO TOKO
+function showStoreInfo(){
+    console.log('Show Store Info');
+    window.location.href = 'about.php';
+}
+
+// ==================== END FITUR ====================
 </script>
 
 </body>

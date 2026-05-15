@@ -1217,6 +1217,63 @@ function startCountdown() {
     }, 1000);
 }
 
+// ==================== 🔥 FITUR TAMBAHAN TEXCER HOT ====================
+
+// 🔥 BELI SEKARANG: Tambah ke cart + langsung redirect ke checkout
+function buyNow(productId, variant = ''){
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = 'cart.php';
+    form.innerHTML = `
+        <input type="hidden" name="add_to_cart" value="1">
+        <input type="hidden" name="product_id" value="${productId}">
+        <input type="hidden" name="quantity" value="1">
+        <input type="hidden" name="variant" value="${variant}">
+        <input type="hidden" name="redirect" value="checkout">
+    `;
+    document.body.appendChild(form);
+    form.submit();
+}
+
+// 🛒 TAMBAH KE KERANJANG: Simpan produk ke session cart
+function addToCart(productId, variant = ''){
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = 'cart.php';
+    form.innerHTML = `
+        <input type="hidden" name="add_to_cart" value="1">
+        <input type="hidden" name="product_id" value="${productId}">
+        <input type="hidden" name="quantity" value="1">
+        <input type="hidden" name="variant" value="${variant}">
+    `;
+    document.body.appendChild(form);
+    form.submit();
+}
+
+// 💬 CHAT WHATSAPP: Buka WA dengan pesan otomatis
+function chatWhatsApp(productId = null, productName = ''){
+    const phone = '6281234567890'; // ⚠️ GANTI DENGAN NOMOR WA ASLI TEXCER HOT!
+    let message = 'Halo Texcer Hot 👋\n\n';
+    
+    if(productName){
+        message += `Saya tertarik dengan produk: *${productName}*\n`;
+        message += `Mohon info lebih lanjut.\n\n`;
+    } else {
+        message += `Saya ingin bertanya.\n\n`;
+    }
+    message += `Terima kasih! 🙏`;
+    
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+}
+
+// 🏪 INFO TOKO: Buka halaman about.php
+function showStoreInfo(){
+    window.location.href = 'about.php';
+}
+
+// ==================== END FITUR ====================
+
 // ── INIT ──
 document.addEventListener('DOMContentLoaded', () => {
     // Auto-select default address

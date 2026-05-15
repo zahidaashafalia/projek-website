@@ -103,6 +103,17 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
         $update_sql .= " WHERE id=$id";
         
         if(mysqli_query($conn, $update_sql)){
+            // ✅ SIMPAN TOPPING YANG DIPILIH
+if(isset($_POST['toppings']) && is_array($_POST['toppings'])){
+    // Hapus topping lama dulu
+    mysqli_query($conn, "DELETE FROM product_toppings WHERE product_id=$id");
+    
+    // Insert topping baru
+    foreach($_POST['toppings'] as $topping_id){
+        $tid = (int)$topping_id;
+        mysqli_query($conn, "INSERT INTO product_toppings (product_id, topping_id) VALUES ($id, $tid)");
+    }
+}
             $_SESSION['success'] = "✅ Produk berhasil diupdate";
         } else {
             $_SESSION['error'] = "❌ Error: " . mysqli_error($conn);
@@ -130,6 +141,14 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
                 VALUES ('$name', '$slug', '$description', $price, $stock, $cat_val, '$category_name', '$image', $is_available)";
         
         if(mysqli_query($conn, $sql)){
+            // ✅ SIMPAN TOPPING UNTUK PRODUK BARU
+if(isset($_POST['toppings']) && is_array($_POST['toppings'])){
+    $new_id = mysqli_insert_id($conn); // Ambil ID produk yang baru dibuat
+    foreach($_POST['toppings'] as $topping_id){
+        $tid = (int)$topping_id;
+        mysqli_query($conn, "INSERT INTO product_toppings (product_id, topping_id) VALUES ($new_id, $tid)");
+    }
+}
             $_SESSION['success'] = "✅ Produk berhasil ditambahkan";
         } else {
             $_SESSION['error'] = "❌ Error: " . mysqli_error($conn);
@@ -183,13 +202,17 @@ $categories = mysqli_query($conn, "SELECT * FROM categories ORDER BY name");
 <aside class="sidebar">
     <div class="sidebar-logo"><i class="fas fa-pepper-hot"></i><span>Texcer Hot</span></div>
     <ul class="sidebar-menu">
-        <li><a href="dashboard.php"><i class="fas fa-home"></i><span>Dashboard</span></a></li>
-        <li><a href="orders.php"><i class="fas fa-shopping-bag"></i><span>Pesanan</span></a></li>
-        <li><a href="products.php" class="active"><i class="fas fa-utensils"></i><span>Produk</span></a></li>
-        <li><a href="categories.php"><i class="fas fa-tags"></i><span>Kategori</span></a></li>
-        <li><a href="customers.php"><i class="fas fa-users"></i><span>Pelanggan</span></a></li>
-        <li><a href="settings.php"><i class="fas fa-cog"></i><span>Pengaturan</span></a></li>
-    </ul>
+    <li><a href="dashboard.php"><i class="fas fa-home"></i><span>Dashboard</span></a></li>
+    <li><a href="orders.php"><i class="fas fa-shopping-bag"></i><span>Pesanan</span></a></li>
+    <li><a href="products.php"><i class="fas fa-utensils"></i><span>Produk</span></a></li>
+    <li><a href="categories.php"><i class="fas fa-tags"></i><span>Kategori</span></a></li>
+    <li><a href="customers.php" class="<?= ($currentPage ?? '') == 'customers.php' ? 'active' : '' ?>"><i class="fas fa-users"></i><span>Pelanggan</span></a></li>
+    
+    <!-- ✅ MENU BARU: Kelola Gambar -->
+    <li><a href="manage-images.php" class="<?= ($currentPage ?? '') == 'manage-images.php' ? 'active' : '' ?>"><i class="fas fa-images"></i><span>Kelola Gambar</span></a></li>
+    
+    <li><a href="settings.php"><i class="fas fa-cog"></i><span>Pengaturan</span></a></li>
+</ul>
 </aside>
 
 <!-- Main Content -->
@@ -334,6 +357,41 @@ $categories = mysqli_query($conn, "SELECT * FROM categories ORDER BY name");
                                 <label class="form-check-label" for="is_available">Produk Tersedia</label>
                             </div>
                         </div>
+                        <!-- ✅ PILIHAN TOPPING -->
+<div class="col-12 mb-3">
+    <label class="form-label fw-bold"><i class="fas fa-drumstick-bite me-1"></i>Topping Tersedia</label>
+    <div class="row" id="topping-list">
+        <?php
+        // Ambil semua topping yang aktif
+        $all_toppings = mysqli_query($conn, "SELECT * FROM toppings WHERE is_available=1 ORDER BY display_order");
+        
+        // Jika edit, ambil topping yang sudah dipilih untuk produk ini
+        $selected_toppings = [];
+        if(isset($p['id']) && $p['id']){
+            $pt = mysqli_query($conn, "SELECT topping_id FROM product_toppings WHERE product_id={$p['id']}");
+            $selected_toppings = array_column(mysqli_fetch_all($pt), 'topping_id');
+        }
+        
+        while($topping = mysqli_fetch_assoc($all_toppings)):
+        ?>
+        <div class="col-md-4 col-sm-6 mb-2">
+            <div class="form-check">
+                <input type="checkbox" 
+                       name="toppings[]" 
+                       value="<?= $topping['id'] ?>" 
+                       class="form-check-input"
+                       id="topping_<?= $topping['id'] ?>"
+                       <?= in_array($topping['id'], $selected_toppings) ? 'checked' : '' ?>>
+                <label class="form-check-label d-flex justify-content-between w-100" for="topping_<?= $topping['id'] ?>">
+                    <span><?= $topping['name'] ?></span>
+                    <span class="text-primary fw-bold">+Rp<?= number_format($topping['price']) ?></span>
+                </label>
+            </div>
+        </div>
+        <?php endwhile; ?>
+    </div>
+    <small class="text-muted">Centang topping yang ingin ditambahkan ke produk ini</small>
+</div>
                     </div>
                 </div>
                 <div class="modal-footer">

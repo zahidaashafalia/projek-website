@@ -2,6 +2,37 @@
 session_start();
 include 'config.php';
 
+// 🔧 CLEANUP: Hapus duplikat & kategori tidak diinginkan (mie, mercon, dimsum, minuman saja)
+if(isset($_GET['cleanup'])){
+    $keep_categories = ['mie', 'mercon', 'dimsum', 'minuman'];
+    $all_cats = mysqli_query($conn, "SELECT * FROM categories ORDER BY id");
+    $kept_ids = [];
+    
+    while($cat = mysqli_fetch_assoc($all_cats)){
+        $cat_name_lower = strtolower(trim($cat['name']));
+        
+        if(in_array($cat_name_lower, $keep_categories)){
+            if(!isset($kept_ids[$cat_name_lower])){
+                $kept_ids[$cat_name_lower] = $cat['id'];
+            } else {
+                // Duplikat: pindahkan produk ke kategori pertama, lalu hapus
+                $old_id = $cat['id'];
+                $new_id = $kept_ids[$cat_name_lower];
+                mysqli_query($conn, "UPDATE products SET category_id=$new_id WHERE category_id=$old_id");
+                mysqli_query($conn, "DELETE FROM categories WHERE id=$old_id");
+            }
+        } else {
+            // Kategori tidak diinginkan: hapus produk + kategori
+            $cat_id = $cat['id'];
+            mysqli_query($conn, "DELETE FROM products WHERE category_id=$cat_id");
+            mysqli_query($conn, "DELETE FROM categories WHERE id=$cat_id");
+        }
+    }
+    $_SESSION['success'] = "✅ Cleanup selesai! Hanya mie, mercon, dimsum, minuman yang tersisa.";
+    header("Location: categories.php");
+    exit;
+}
+
 if(!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin'){
     header("Location: auth/login.php");
     exit;
@@ -18,7 +49,6 @@ mysqli_query($conn, "CREATE TABLE IF NOT EXISTS categories (
 // Handle delete category
 if(isset($_GET['delete'])){
     $id = (int)$_GET['delete'];
-    // Check if category has products
     $check = mysqli_query($conn, "SELECT COUNT(*) as count FROM products WHERE category_id=$id");
     $row = mysqli_fetch_assoc($check);
     if($row['count'] > 0){
@@ -36,11 +66,28 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
     $name = mysqli_real_escape_string($conn, $_POST['name']);
     $slug = strtolower(str_replace(' ', '-', preg_replace('/[^A-Za-z0-9 ]/', '', $name)));
     
+    // 🔧 CLEANUP: Cek duplikat sebelum simpan
+    $check_dup = mysqli_query($conn, "SELECT id FROM categories WHERE LOWER(TRIM(name))='" . strtolower(trim($name)) . "'");
+    
     if(isset($_POST['id']) && $_POST['id']){
         $id = (int)$_POST['id'];
+        // Exclude current category from duplicate check
+        $check_dup = mysqli_query($conn, "SELECT id FROM categories WHERE LOWER(TRIM(name))='" . strtolower(trim($name)) . "' AND id != $id");
+        
+        if(mysqli_num_rows($check_dup) > 0){
+            $_SESSION['error'] = "❌ Kategori '$name' sudah ada!";
+            header("Location: categories.php");
+            exit;
+        }
+        
         mysqli_query($conn, "UPDATE categories SET name='$name', slug='$slug' WHERE id=$id");
         $_SESSION['success'] = "Kategori berhasil diupdate";
     } else {
+        if(mysqli_num_rows($check_dup) > 0){
+            $_SESSION['error'] = "❌ Kategori '$name' sudah ada!";
+            header("Location: categories.php");
+            exit;
+        }
         mysqli_query($conn, "INSERT INTO categories (name, slug) VALUES ('$name', '$slug')");
         $_SESSION['success'] = "Kategori berhasil ditambahkan";
     }
@@ -87,22 +134,29 @@ $categories = mysqli_query($conn, "SELECT c.*, COUNT(p.id) as product_count
 <aside class="sidebar">
     <div class="sidebar-logo"><i class="fas fa-pepper-hot"></i><span>Texcer Hot</span></div>
     <ul class="sidebar-menu">
-        <li><a href="dashboard.php"><i class="fas fa-home"></i><span>Dashboard</span></a></li>
-        <li><a href="orders.php"><i class="fas fa-shopping-bag"></i><span>Pesanan</span></a></li>
-        <li><a href="products.php"><i class="fas fa-utensils"></i><span>Produk</span></a></li>
-        <li><a href="categories.php" class="active"><i class="fas fa-tags"></i><span>Kategori</span></a></li>
-        <li><a href="customers.php"><i class="fas fa-users"></i><span>Pelanggan</span></a></li>
-        <li><a href="settings.php"><i class="fas fa-cog"></i><span>Pengaturan</span></a></li>
-    </ul>
+    <li><a href="dashboard.php"><i class="fas fa-home"></i><span>Dashboard</span></a></li>
+    <li><a href="orders.php"><i class="fas fa-shopping-bag"></i><span>Pesanan</span></a></li>
+    <li><a href="products.php"><i class="fas fa-utensils"></i><span>Produk</span></a></li>
+    <li><a href="categories.php"><i class="fas fa-tags"></i><span>Kategori</span></a></li>
+    <li><a href="customers.php" class="<?= ($currentPage ?? '') == 'customers.php' ? 'active' : '' ?>"><i class="fas fa-users"></i><span>Pelanggan</span></a></li>
+    <li><a href="manage-images.php" class="<?= ($currentPage ?? '') == 'manage-images.php' ? 'active' : '' ?>"><i class="fas fa-images"></i><span>Kelola Gambar</span></a></li>
+    <li><a href="settings.php"><i class="fas fa-cog"></i><span>Pengaturan</span></a></li>
+</ul>
 </aside>
 
 <!-- Main Content -->
 <main class="main-content">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2><i class="fas fa-tags me-2"></i>Kelola Kategori</h2>
-        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#categoryModal" onclick="resetForm()">
-            <i class="fas fa-plus me-2"></i>Tambah Kategori
-        </button>
+        <!-- 🔧 CLEANUP: Tombol bersihkan kategori -->
+        <div>
+            <a href="?cleanup=1" class="btn btn-warning me-2" onclick="return confirm('⚠️ PERINGATAN:\n\n- Kategori selain mie, mercon, dimsum, minuman akan DIHAPUS\n- Produk di kategori terhapus akan ikut DIHAPUS\n- Duplikat kategori akan digabung\n\nLanjutkan?')">
+                <i class="fas fa-broom me-2"></i>Bersihkan Kategori
+            </a>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#categoryModal" onclick="resetForm()">
+                <i class="fas fa-plus me-2"></i>Tambah Kategori
+            </button>
+        </div>
     </div>
 
     <?php if(isset($_SESSION['success'])): ?>
@@ -176,7 +230,7 @@ $categories = mysqli_query($conn, "SELECT c.*, COUNT(p.id) as product_count
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">Nama Kategori *</label>
-                        <input type="text" name="name" id="name" class="form-control" placeholder="Contoh: Makanan, Minuman, Snack" required>
+                        <input type="text" name="name" id="name" class="form-control" placeholder="Contoh: Mie, Mercon, Dimsum, Minuman" required>
                         <small class="text-muted">Slug akan dibuat otomatis dari nama</small>
                     </div>
                 </div>
