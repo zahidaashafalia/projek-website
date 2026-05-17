@@ -582,7 +582,11 @@ body {
 
 /* ── EMPTY CART ── */
 .empty-cart {
-    text-align: center;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
     padding: 80px 20px;
     background: var(--bg-white);
     margin: 20px 0;
@@ -591,6 +595,7 @@ body {
 .empty-cart i { font-size: 5rem; color: var(--primary); opacity: .2; margin-bottom: 20px; }
 .empty-cart h3 { font-size: 1.2rem; font-weight: 700; color: var(--text-dark); margin-bottom: 8px; }
 .empty-cart p  { color: var(--text-gray); margin-bottom: 24px; }
+
 .btn-shop {
     background: var(--primary);
     color: white;
@@ -600,9 +605,14 @@ body {
     font-weight: 700;
     cursor: pointer;
     text-decoration: none;
-    display: inline-block;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
     transition: all .2s;
+    margin: 0 auto;
 }
+
 .btn-shop:hover { background: var(--primary-dark); color: white; transform: translateY(-2px); }
 
 /* ── BOTTOM BAR ── */
@@ -984,7 +994,7 @@ body {
         <h3>Keranjang Kosong</h3>
         <p>Yuk, pesan makanan pedas favoritmu sekarang!</p>
         <a href="index.php" class="btn-shop">
-            <i class="fas fa-fire me-2"></i>Mulai Pesan
+        Mulai Pesan
         </a>
     </div>
 

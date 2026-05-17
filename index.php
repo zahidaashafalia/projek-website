@@ -1,30 +1,39 @@
 <?php include 'config.php';
 include 'functions.php';
 
-// 🔥 AMBIL SETTINGS DARI DATABASE DENGAN ERROR HANDLING 🔥
+// 🔥 AMBIL SETTINGS + STORE PROFILE DARI DATABASE 🔥
 $settings = [];
+$profile = [];
+
+// Ambil settings
 $settings_query = mysqli_query($conn, "SELECT * FROM settings WHERE id=1 LIMIT 1");
 if($settings_query && mysqli_num_rows($settings_query) > 0){
     $settings = mysqli_fetch_assoc($settings_query);
+}
+
+// Ambil store profile
+$profile_query = mysqli_query($conn, "SELECT * FROM store_profile WHERE id=1 LIMIT 1");
+if($profile_query && mysqli_num_rows($profile_query) > 0){
+    $profile = mysqli_fetch_assoc($profile_query);
 } else {
-    // Default values jika tidak ada data
-    $settings = [
-        'site_title' => 'Texcer Hott',
-        'hero_title' => 'ORDER MAKANAN',
-        'hero_subtitle' => 'Welcome to Texcer Hot',
-        'hero_button_text' => 'Pesan Sekarang',
-        'menu_section_title' => 'Menu',
-        'menu_section_subtitle' => 'makanan pedas',
-        'testimonials_section_title' => 'Testimoni',
-        'testimonials_section_subtitle' => 'Lihat apa kata mereka tentang Texcer Hot',
-        'location_section_title' => 'Lokasi Kami',
-        'location_section_subtitle' => 'Kunjungi Texcer Hot atau pesan online untuk pengiriman',
-        'whatsapp_number' => '6281234567890',
-        'email' => 'info@texcerhot.com',
+    // Fallback jika tidak ada data profile
+    $profile = [
+        'store_name' => 'Texcer Hot',
+        'tagline' => 'TEMAN PEDASMU 🌶️',
+        'description' => 'Pusat kuliner pedas dan nikmat di Jepara.',
+        'logo_path' => 'assets/images/logo-texcer.png',
+        'cover_path' => 'assets/images/cover-texcer.jpg',
         'address' => 'Depan SMPN 1 Bangsri, Jepara',
+        'whatsapp' => '6281934174198',
+        'email' => 'info@texcerhot.com',
+        'instagram' => 'texcer.hot',
+        'tiktok' => 'texcer.hot',
         'opening_hours' => '11:00 - 20:00 WIB',
-        'footer_about' => 'Pesan makanan pedas favoritmu sekarang!',
-        'footer_copyright' => '© 2020 - 2026 Texcer Hot'
+        'latitude' => -6.52364605,
+        'longitude' => 110.76685962,
+        'rating_avg' => 4.8,
+        'total_reviews' => 100,
+        'established_year' => 2020
     ];
 }
 // Contoh di admin.php saat update status
@@ -1425,16 +1434,6 @@ body {
 
                 <div class="info-card">
                     <div class="info-icon">
-                        <i class="fas fa-phone-alt"></i>
-                    </div>
-                    <div class="info-content">
-                        <h4>Hubungi Kami</h4>
-                        <p>+62 819-3417-4198<br>info@texcerhot.com</p>
-                    </div>
-                </div>
-
-                <div class="info-card">
-                    <div class="info-icon">
                         <i class="fas fa-shipping-fast"></i>
                     </div>
                     <div class="info-content">
@@ -1448,10 +1447,6 @@ body {
                     <i class="fab fa-whatsapp"></i> Chat WhatsApp
                     </a>
 
-                    <button type="button" onclick="showStoreInfo()" style="background: none; border: none; cursor: pointer; padding: 8px;">
-    <i class="fas fa-store"></i>
-    <div style="font-size: 0.75rem; margin-top: 2px;">Toko</div>
-</button>
 
                     <a href="https://www.google.com/maps/place/Texcer+Hot+Cabang+Bangsri/@-6.523646,110.7668596,17z/data=!4m6!3m5!1s0x0:0x0!8m2!3d-6.523646052367316!4d110.7668596153108!16s%2Fg%2F11abc123xyz?entry=ttu" target="_blank" class="btn-directions">
                     <i class="fas fa-directions"></i> Petunjuk Arah
@@ -1461,6 +1456,7 @@ body {
         </div>
     </div>
 </section>
+
 
 <style>
 /* Location Section Styles */
@@ -1892,60 +1888,62 @@ document.getElementById('trackingInput')?.addEventListener('keypress', function(
             </a>
         </div>
 
-        <!-- Kolom Bantuan -->
-        <div class="footer-section">
-            <h4>Bantuan</h4>
-            <a href="#">
-                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01"/></svg>
-                FAQ
-            </a>
-            <a href="#">
-                <svg viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                Syarat & Ketentuan
-            </a>
-            <a href="#">
-                <svg viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                Kebijakan Privasi
-            </a>
-            <a href="#">
-                <svg viewBox="0 0 24 24"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                Hubungi Kami
-            </a>
-        </div>
+<!-- Kolom Bantuan -->
+<div class="footer-section">
+    <h4>Bantuan</h4>
+    <a href="faq.php">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01"/></svg>
+        FAQ
+    </a>
+    <a href="syarat.php">
+        <svg viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        Syarat & Ketentuan
+    </a>
+    <a href="privasi.php">
+        <svg viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        Kebijakan Privasi
+    </a>
+    <a href="https://wa.me/6281934174198?text=Halo%20Texcer%20Hot%2C%20saya%20butuh%20bantuan" target="_blank">
+        <svg viewBox="0 0 24 24"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+        Hubungi Kami
+    </a>
+</div>
 
-        <!-- Kolom Kontak -->
-        <div class="footer-section">
-            <h4>Kontak</h4>
-            <a href="#">
-                <svg viewBox="0 0 24 24"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                <p><?= htmlspecialchars($settings['address'] ?? 'Depan SMPN 1 Bangsri, Jepara') ?></p>
-            </a>
-            <a href="#">
-                <svg viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-                <p><?= htmlspecialchars($settings['whatsapp_number'] ?? '+62 819-3417-4198') ?></p>
-            </a>
-            <a href="#">
-                <svg viewBox="0 0 24 24"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                <p><?= htmlspecialchars($settings['email'] ?? 'info@texcerhot.com') ?></p>
-            </a>
-            <a href="#">
-                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                <p><?= htmlspecialchars($settings['opening_hours'] ?? '11:00 - 20:00 WIB') ?></p>
-            </a>
-        </div>
+<!-- Kolom Kontak -->
+<div class="footer-section">
+    <h4>Kontak</h4>
+    <a href="https://maps.google.com/?q=SMPN+1+Bangsri+Jepara" target="_blank">
+        <svg viewBox="0 0 24 24"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        <?= htmlspecialchars($settings['address'] ?? 'Depan SMPN 1 Bangsri, Jepara') ?>
+    </a>
+    <a href="https://wa.me/<?= htmlspecialchars($settings['whatsapp_number'] ?? '6281934174198') ?>">
+        <svg viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+        <?= htmlspecialchars($settings['whatsapp_number'] ?? '+62 819-3417-4198') ?>
+    </a>
+    <a href="mailto:<?= htmlspecialchars($settings['email'] ?? 'hello@texcerhot.com') ?>">
+        <svg viewBox="0 0 24 24"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+        <?= htmlspecialchars($settings['email'] ?? 'hello@texcerhot.com') ?>
+    </a>
+    <a href="#">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <?= htmlspecialchars($settings['opening_hours'] ?? '11:00 - 21:00 WIB') ?>
+    </a>
+</div>
+</div>
 
-    </div>
-
-    <div class="footer-bottom">
-        <p><?= htmlspecialchars($settings['footer_copyright'] ?? '© 2020 - 2026 Texcer Hot') ?></p>
+ <div class="footer-bottom">
+        <p>© 2020 – 2026 <strong>Texcer Hot</strong>. Berdiri sejak 2020.</p>
         <p>Didirikan oleh <strong>Ahmad Amrullah Baharuddin</strong> · All rights reserved.</p>
     </div>
 </footer>
-
 <!-- Modal Detail Produk -->
 <div class="modal fade" id="modalDetail" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-fullscreen-md-down">
-        <div class="modal-content" style="border: none; border-radius: 0;">
+    <div class="modal-content" 
+     data-id="<?= $produk['id'] ?>" 
+     data-price="<?= $produk['harga'] ?>" 
+     style="border: none; border-radius: 0;">
+            
             
             <!-- Header dengan back button -->
             <div class="modal-header" style="border-bottom: 1px solid #e0e0e0; padding: 12px 16px; position: sticky; top: 0; background: white; z-index: 100;">
@@ -2116,25 +2114,28 @@ document.getElementById('trackingInput')?.addEventListener('keypress', function(
                 </div>
 
                 <!-- Store Info -->
-                <div style="padding: 16px; border-bottom: 1px solid #f0f0f0;">
-                    <div style="display: flex; align-items: center; gap: 12px;">
-                        <div style="width: 48px; height: 48px; border-radius: 50%; background: #f0f0f0; display: flex; align-items: center; justify-content: center;">
-                            <i class="fas fa-store" style="font-size: 1.5rem; color: #999;"></i>
-                        </div>
-                        <div style="flex: 1;">
-                            <div style="font-weight: 600; font-size: 1rem;">Texcer Hot</div>
-                            <div style="font-size: 0.85rem; color: #666;">
-                                <i class="fas fa-star" style="color: #ffd500;"></i> 3.6 &nbsp; 24.6K terjual
-                            </div>
-                        </div>
-                        <button onclick="showStoreProfile()" style="background: var(--primary); border: none; padding: 8px 16px; border-radius: 20px; font-weight: 600; color: white; cursor: pointer;">Kunjungi</button>
-                    </div>
-                    <div style="margin-top: 12px; font-size: 0.85rem; color: #666;">
-                        <span>100% merespons dalam 24j</span> &nbsp; 
-                        <span>69% mengirim dalam 48j</span>
-                    </div>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="width: 48px; height: 48px; border-radius: 50%; background: #f0f0f0; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 2px solid var(--primary);">
+                <?php 
+                $logo_path = !empty($profile['logo_path']) ? $profile['logo_path'] : 'assets/images/logo-texcer.png';
+                if(file_exists($logo_path)): 
+                ?>
+                <img src="<?= htmlspecialchars($logo_path) ?>" 
+                 alt="Texcer Hot Logo" 
+                 style="width:100%; height:100%; object-fit: cover;"
+                 onerror="this.style.display='none'; this.parentElement.innerHTML='<i class=\'fas fa-store\' style=\'font-size: 1.5rem; color: var(--primary);\'></i>'">
+                <?php else: ?>
+                <i class="fas fa-store" style="font-size: 1.5rem; color: var(--primary);"></i>
+                <?php endif; ?>
                 </div>
-
+                <div style="flex: 1;">
+                <div style="font-weight: 600; font-size: 1rem;">Texcer Hot</div>
+                <div style="font-size: 0.85rem; color: #666;">
+                <i class="fas fa-star" style="color: #ffd500;"></i> 3.6 &nbsp; 24.6K terjual
+        </div>
+    </div>
+    <button onclick="showStoreProfile()" style="background: var(--primary); border: none; padding: 8px 16px; border-radius: 20px; font-weight: 600; color: white; cursor: pointer;">Kunjungi</button>
+</div>
                 <!-- Komisi Section -->
                 <div style="padding: 12px 16px; background: #FFF8E1; border-bottom: 1px solid #f0f0f0;">
                     <div style="display: flex; align-items: center; gap: 8px;">
@@ -2146,11 +2147,16 @@ document.getElementById('trackingInput')?.addEventListener('keypress', function(
                 </div>
             </div>
 
-            <!-- ✅ PROFIL TOKO (Awalnya disembunyikan) -->
+<!-- ✅ PROFIL TOKO DINAMIS (Diambil dari Database) -->
 <div id="storeProfileContent" style="display: none;">
     <!-- Cover Foto Toko -->
-    <div style="width: 100%; height: 200px; background-color: #eee; position: relative;">
-        <img src="assets/images/logo-texcer.png" style="width:100%; height:100%; object-fit: cover;">
+    <div style="width: 100%; height: 200px; position: relative; overflow: hidden;">
+        <img src="<?= !empty($profile['cover_path']) ? htmlspecialchars($profile['cover_path']) : 'https://via.placeholder.com/1200x400?text=Texcer+Hot' ?>" 
+             style="width:100%; height:100%; object-fit: cover;">
+        <div style="position: absolute; bottom: 0; left: 0; right: 0; padding: 20px; background: linear-gradient(transparent, rgba(0,0,0,0.7));">
+            <h3 style="margin: 0; color: white; font-size: 1.5rem;"><?= htmlspecialchars($profile['store_name']) ?></h3>
+            <p style="margin: 4px 0 0; color: rgba(255,255,255,0.9); font-size: 0.95rem;"><?= htmlspecialchars($profile['tagline']) ?></p>
+        </div>
         <!-- Tombol Back -->
         <button onclick="backToProduct()" style="position: absolute; top: 15px; left: 15px; background: white; border: none; width: 40px; height: 40px; border-radius: 50%; box-shadow: 0 2px 5px rgba(0,0,0,0.2); cursor: pointer; display:flex; align-items:center; justify-content:center;">
             <i class="fas fa-arrow-left" style="color: var(--primary);"></i>
@@ -2158,47 +2164,109 @@ document.getElementById('trackingInput')?.addEventListener('keypress', function(
     </div>
 
     <div style="padding: 20px;">
-        <!-- Logo & Nama Toko -->
-        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
-            <div style="width: 60px; height: 60px; border-radius: 50%; background: #eee; overflow: hidden; border: 2px solid var(--primary);">
-                <img src="assets/images/logo-texcer.png" style="width:100%; height:100%; object-fit: cover;">
+        <!-- Logo & Info Utama -->
+        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
+            <div style="width: 70px; height: 70px; border-radius: 50%; background: #eee; overflow: hidden; border: 3px solid var(--primary); flex-shrink: 0;">
+                <img src="<?= !empty($profile['logo_path']) ? htmlspecialchars($profile['logo_path']) : 'https://via.placeholder.com/70?text=TH' ?>" 
+                     style="width:100%; height:100%; object-fit: cover;">
             </div>
-            <div>
-                <h3 style="margin: 0; font-size: 1.3rem; font-weight: 700;">Texcer Hot</h3>
-                <p style="margin: 2px 0 0; color: var(--text-gray); font-size: 0.85rem;">
-                    <i class="fas fa-star" style="color: #ffd500;"></i> 4.8 (100+ Rating) &nbsp;|&nbsp; Online
+            <div style="flex: 1;">
+                <h3 style="margin: 0; font-size: 1.3rem; font-weight: 700;"><?= htmlspecialchars($profile['store_name']) ?></h3>
+                <p style="margin: 4px 0; color: var(--text-gray); font-size: 0.9rem;">
+                    <i class="fas fa-star" style="color: #ffd500;"></i> 
+                    <strong><?= number_format($profile['rating_avg'], 1) ?></strong> 
+                    (<?= number_format($profile['total_reviews']) ?>+ Rating)
                 </p>
+                <p style="margin: 2px 0; font-size: 0.85rem; color: #25D366;">
+                    <i class="fas fa-circle" style="font-size: 8px; margin-right: 4px;"></i> Online • Merespons cepat
+                </p>
+            </div>
+            <div style="text-align: right;">
+                <span style="background: var(--accent); color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;">
+                    Sejak <?= $profile['established_year'] ?>
+                </span>
             </div>
         </div>
 
         <!-- Deskripsi Toko -->
         <div style="background: var(--bg-cream); padding: 15px; border-radius: 12px; margin-bottom: 20px;">
-            <h5 style="margin: 0 0 8px; font-size: 1rem;">Tentang Toko</h5>
-            <p style="margin: 0; font-size: 0.9rem; color: var(--text-gray); line-height: 1.5;">
-                Texcer Hot Cabang Bangsri - Pusat kuliner pedas dan nikmat di Jepara. 
-                Kami menyediakan Mie Yamin, Dimsum, dan Minuman segar. 
-                Dibuka sejak 2020 dengan resep turun temurun.
+            <h5 style="margin: 0 0 8px; font-size: 1rem; font-weight: 700;">📝 Tentang Kami</h5>
+            <p style="margin: 0; font-size: 0.9rem; color: var(--text-gray); line-height: 1.6;">
+                <?= nl2br(htmlspecialchars($profile['description'])) ?>
             </p>
         </div>
 
-        <!-- Info Lokasi -->
+        <!-- Stats -->
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px;">
+            <div style="text-align: center; padding: 12px; background: white; border-radius: 10px; border: 1px solid var(--border);">
+                <div style="font-size: 1.3rem; font-weight: 700; color: var(--primary);">10rb+</div>
+                <div style="font-size: 0.75rem; color: var(--text-gray);">Pesanan</div>
+            </div>
+            <div style="text-align: center; padding: 12px; background: white; border-radius: 10px; border: 1px solid var(--border);">
+                <div style="font-size: 1.3rem; font-weight: 700; color: var(--primary);"><?= number_format($profile['total_reviews']) ?>+</div>
+                <div style="font-size: 0.75rem; color: var(--text-gray);">Ulasan</div>
+            </div>
+            <div style="text-align: center; padding: 12px; background: white; border-radius: 10px; border: 1px solid var(--border);">
+                <div style="font-size: 1.3rem; font-weight: 700; color: var(--primary);">4.8</div>
+                <div style="font-size: 0.75rem; color: var(--text-gray);">Rating</div>
+            </div>
+        </div>
+
+        <!-- Info Lokasi & Kontak -->
         <div style="margin-bottom: 20px;">
-            <h5 style="font-size: 1rem; margin-bottom: 10px;">Lokasi & Jam Buka</h5>
-            <p style="font-size: 0.9rem; margin: 5px 0; color: var(--text-gray);">
-                <i class="fas fa-map-marker-alt" style="width: 20px; color: var(--primary);"></i> Depan SMPN 1 Bangsri, Jepara
-            </p>
-            <p style="font-size: 0.9rem; margin: 5px 0; color: var(--text-gray);">
-                <i class="fas fa-clock" style="width: 20px; color: var(--primary);"></i> Buka: 11.00 - 20.00 WIB
-            </p>
+            <h5 style="font-size: 1rem; margin-bottom: 12px; font-weight: 700;">📍 Lokasi & Kontak</h5>
+            
+            <div style="display: flex; gap: 8px; margin-bottom: 10px; font-size: 0.9rem;">
+                <i class="fas fa-map-marker-alt" style="width: 20px; color: var(--primary); margin-top: 3px;"></i>
+                <span style="color: var(--text-gray);"><?= htmlspecialchars($profile['address']) ?></span>
+            </div>
+            
+            <div style="display: flex; gap: 8px; margin-bottom: 10px; font-size: 0.9rem;">
+                <i class="fas fa-clock" style="width: 20px; color: var(--primary); margin-top: 3px;"></i>
+                <span style="color: var(--text-gray);"><?= htmlspecialchars($profile['opening_hours']) ?></span>
+            </div>
+            
+            <div style="display: flex; gap: 8px; margin-bottom: 10px; font-size: 0.9rem;">
+                <i class="fab fa-whatsapp" style="width: 20px; color: #25D366; margin-top: 3px;"></i>
+                <a href="https://wa.me/<?= htmlspecialchars($profile['whatsapp']) ?>" target="_blank" style="color: var(--text-gray); text-decoration: none;">
+                    +<?= htmlspecialchars($profile['whatsapp']) ?>
+                </a>
+            </div>
+            
+            <div style="display: flex; gap: 8px; margin-bottom: 10px; font-size: 0.9rem;">
+                <i class="fas fa-envelope" style="width: 20px; color: var(--primary); margin-top: 3px;"></i>
+                <a href="mailto:<?= htmlspecialchars($profile['email']) ?>" style="color: var(--text-gray); text-decoration: none;">
+                    <?= htmlspecialchars($profile['email']) ?>
+                </a>
+            </div>
+        </div>
+
+        <!-- Social Media -->
+        <div style="margin-bottom: 20px;">
+            <h5 style="font-size: 1rem; margin-bottom: 12px; font-weight: 700;">🔗 Ikuti Kami</h5>
+            <div style="display: flex; gap: 12px;">
+                <a href="https://instagram.com/<?= htmlspecialchars($profile['instagram']) ?>" target="_blank" 
+                   style="flex: 1; padding: 10px; background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888); color: white; text-decoration: none; text-align: center; border-radius: 10px; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                    <i class="fab fa-instagram"></i> Instagram
+                </a>
+                <a href="https://tiktok.com/@<?= htmlspecialchars($profile['tiktok']) ?>" target="_blank" 
+                   style="flex: 1; padding: 10px; background: #000; color: white; text-decoration: none; text-align: center; border-radius: 10px; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                    <i class="fab fa-tiktok"></i> TikTok
+                </a>
+            </div>
         </div>
 
         <!-- Tombol Aksi -->
-        <div style="display: flex; gap: 10px;">
-            <a href="https://wa.me/6281934174198" target="_blank" style="flex: 1; padding: 12px; background: #25D366; color: white; text-decoration: none; text-align: center; border-radius: 20px; font-weight: 600;">
-                <i class="fab fa-whatsapp"></i> Chat Admin
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <a href="https://wa.me/<?= htmlspecialchars($profile['whatsapp']) ?>?text=Halo%20Texcer%20Hot,%20saya%20mau%20pesan!" 
+               target="_blank" 
+               style="flex: 1; min-width: 140px; padding: 14px; background: #25D366; color: white; text-decoration: none; text-align: center; border-radius: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <i class="fab fa-whatsapp" style="font-size: 1.2rem;"></i> Chat WhatsApp
             </a>
-            <a href="https://www.google.com/maps/dir/Current+Location/-6.523646052367316,110.7668596153108" target="_blank" style="flex: 1; padding: 12px; background: var(--primary); color: white; text-decoration: none; text-align: center; border-radius: 20px; font-weight: 600;">
-                <i class="fas fa-map"></i> Petunjuk Arah
+            <a href="https://www.google.com/maps/dir/Current+Location/<?= $profile['latitude'] ?>,<?= $profile['longitude'] ?>" 
+               target="_blank" 
+               style="flex: 1; min-width: 140px; padding: 14px; background: var(--primary); color: white; text-decoration: none; text-align: center; border-radius: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <i class="fas fa-map-marked-alt"></i> Petunjuk Arah
             </a>
         </div>
     </div>
@@ -2232,6 +2300,7 @@ document.getElementById('trackingInput')?.addEventListener('keypress', function(
     <!-- ✅ FIX: Tombol Keranjang → submit form, buy_now=0 -->
     <button type="submit" form="modalFormPesan"
         onclick="document.getElementById('modal-buy-now').value='0'"
+        class="beli-sekarang-btn" 
         style="background: #f0f0f0; border: none; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; margin: 0 4px; cursor: pointer; flex-shrink: 0;">
         <i class="fas fa-shopping-cart" style="color: var(--primary); font-size: 1.3rem;"></i>
     </button>
@@ -2637,34 +2706,45 @@ function buyNow() {
     window.location.href = `checkout.php?buy_now=1&id=${productId}&name=${encodeURIComponent(productName)}&price=${productPrice}&qty=1`;
 }
 
-// Fungsi Tampilkan Profil Toko
+// Fungsi Tampilkan Profil Toko (Update)
 function showStoreProfile() {
-    // Sembunyikan semua isi modal body (detail produk)
-    var modalBody = document.querySelector('#modalDetail .modal-body');
-    var children = modalBody.children;
-    for(var i = 0; i < children.length; i++){
+    const modalBody = document.querySelector('#modalDetail .modal-body');
+    const children = modalBody.children;
+    
+    // Sembunyikan semua kecuali storeProfileContent
+    for(let i = 0; i < children.length; i++){
         if(children[i].id !== 'storeProfileContent'){
             children[i].style.display = 'none';
         }
     }
+    
     // Tampilkan profil toko
     document.getElementById('storeProfileContent').style.display = 'block';
     modalBody.scrollTop = 0;
+    
+    // Update judul modal
+    document.querySelector('#modalDetail .modal-title').innerText = 'Profil Toko';
 }
 
-// Fungsi Kembali ke Produk
+// Fungsi Kembali ke Produk (Update)
 function backToProduct() {
-    // Sembunyikan profil toko
-    document.getElementById('storeProfileContent').style.display = 'none';
+    const modalBody = document.querySelector('#modalDetail .modal-body');
+    const children = modalBody.children;
     
-    // Tampilkan kembali semua isi modal body
-    var modalBody = document.querySelector('#modalDetail .modal-body');
-    var children = modalBody.children;
-    for(var i = 0; i < children.length; i++){
+    // Tampilkan kembali semua konten produk
+    for(let i = 0; i < children.length; i++){
         if(children[i].id !== 'storeProfileContent'){
             children[i].style.display = 'block';
         }
     }
+    
+    // Sembunyikan profil toko
+    document.getElementById('storeProfileContent').style.display = 'none';
+    
+    // Kembalikan judul modal
+    const productName = document.getElementById('md-name')?.innerText || 'Detail Produk';
+    document.querySelector('#modalDetail .modal-title').innerText = productName;
+    
     modalBody.scrollTop = 0;
 }
 // ==================== FITUR TEXCER HOT ====================
@@ -2722,6 +2802,357 @@ function showStoreInfo(){
 }
 
 // ==================== END FITUR ====================
+</script>
+<script>
+// ========== CART FUNCTIONALITY ==========
+let cart = JSON.parse(localStorage.getItem('texcer_cart')) || [];
+let wishlist = JSON.parse(localStorage.getItem('texcer_wishlist')) || [];
+
+// Update cart count
+function updateCartCount() {
+    const cartCount = document.querySelector('.cart-count');
+    const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+    if (cartCount) {
+        cartCount.textContent = totalItems;
+        cartCount.style.display = totalItems > 0 ? 'flex' : 'none';
+    }
+}
+
+// Add to cart
+function addToCart(productId, productName, productPrice, productImage, quantity = 1) {
+    const existingItem = cart.find(item => item.id === productId);
+    
+    if (existingItem) {
+        existingItem.quantity += quantity;
+    } else {
+        cart.push({
+            id: productId,
+            name: productName,
+            price: productPrice,
+            image: productImage,
+            quantity: quantity
+        });
+    }
+    
+    localStorage.setItem('texcer_cart', JSON.stringify(cart));
+    updateCartCount();
+    
+    // Show notification
+    showNotification('Produk ditambahkan ke keranjang!');
+}
+
+// Remove from cart
+function removeFromCart(productId) {
+    cart = cart.filter(item => item.id !== productId);
+    localStorage.setItem('texcer_cart', JSON.stringify(cart));
+    updateCartCount();
+    renderCart();
+    showNotification('Produk dihapus dari keranjang');
+}
+
+// Update cart item quantity
+function updateCartItemQuantity(productId, quantity) {
+    const item = cart.find(item => item.id === productId);
+    if (item) {
+        if (quantity <= 0) {
+            removeFromCart(productId);
+        } else {
+            item.quantity = quantity;
+            localStorage.setItem('texcer_cart', JSON.stringify(cart));
+            updateCartCount();
+            renderCart();
+        }
+    }
+}
+
+// Render cart items
+function renderCart() {
+    const cartItems = document.querySelector('.cart-items');
+    const cartTotal = document.querySelector('.cart-total');
+    
+    if (!cartItems) return;
+    
+    if (cart.length === 0) {
+        cartItems.innerHTML = '<p style="text-align: center; padding: 40px; color: #888;">Keranjang kosong</p>';
+        if (cartTotal) cartTotal.style.display = 'none';
+        return;
+    }
+    
+    let html = '';
+    let total = 0;
+    
+    cart.forEach(item => {
+        const subtotal = item.price * item.quantity;
+        total += subtotal;
+        html += `
+            <div class="cart-item" style="display: flex; gap: 15px; padding: 15px; background: #fff; border-radius: 10px; margin-bottom: 10px;">
+                <img src="${item.image}" alt="${item.name}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 8px;">
+                <div style="flex: 1;">
+                    <h4 style="margin: 0 0 5px 0; color: #4A3728;">${item.name}</h4>
+                    <p style="margin: 0 0 10px 0; color: #8B6F47; font-weight: 600;">Rp ${item.price.toLocaleString('id-ID')}</p>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <button onclick="updateCartItemQuantity('${item.id}', ${item.quantity - 1})" style="width: 28px; height: 28px; border: 1px solid #ddd; background: #fff; border-radius: 5px; cursor: pointer;">-</button>
+                            <span style="font-weight: 600;">${item.quantity}</span>
+                            <button onclick="updateCartItemQuantity('${item.id}', ${item.quantity + 1})" style="width: 28px; height: 28px; border: 1px solid #ddd; background: #fff; border-radius: 5px; cursor: pointer;">+</button>
+                        </div>
+                        <button onclick="removeFromCart('${item.id}')" style="background: none; border: none; color: #e74c3c; cursor: pointer;"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    cartItems.innerHTML = html;
+    
+    if (cartTotal) {
+        cartTotal.style.display = 'block';
+        cartTotal.innerHTML = `
+            <div style="border-top: 2px solid #eee; padding-top: 15px; margin-top: 15px;">
+                <div style="display: flex; justify-content: space-between; font-size: 1.2rem; font-weight: 700; color: #4A3728;">
+                    <span>Total</span>
+                    <span>Rp ${total.toLocaleString('id-ID')}</span>
+                </div>
+                <button onclick="checkout()" style="width: 100%; padding: 15px; background: #8B6F47; color: #fff; border: none; border-radius: 10px; font-size: 1rem; font-weight: 600; margin-top: 15px; cursor: pointer;">Checkout</button>
+            </div>
+        `;
+    }
+}
+
+// Checkout
+function checkout() {
+    if (cart.length === 0) {
+        showNotification('Keranjang masih kosong!');
+        return;
+    }
+    window.location.href = 'pesanan.php';
+}
+
+// ========== WISHLIST FUNCTIONALITY ==========
+function toggleWishlist(productId, productName, productPrice, productImage, btn) {
+    const index = wishlist.findIndex(item => item.id === productId);
+    
+    if (index > -1) {
+        wishlist.splice(index, 1);
+        btn.classList.remove('active');
+        showNotification('Dihapus dari disimpan');
+    } else {
+        wishlist.push({
+            id: productId,
+            name: productName,
+            price: productPrice,
+            image: productImage
+        });
+        btn.classList.add('active');
+        showNotification('Produk disimpan');
+    }
+    
+    localStorage.setItem('texcer_wishlist', JSON.stringify(wishlist));
+    updateWishlistCount();
+}
+
+function updateWishlistCount() {
+    const wishlistCount = document.querySelector('.wishlist-count');
+    if (wishlistCount) {
+        wishlistCount.textContent = wishlist.length;
+    }
+}
+
+// ========== SHARE FUNCTIONALITY ==========
+async function shareProduct(productId, productName, productPrice) {
+    const shareData = {
+        title: productName,
+        text: `Cek menu ${productName} di Texcer Hot - Rp ${productPrice.toLocaleString('id-ID')}`,
+        url: window.location.origin + '/texcer2/menu.php?id=' + productId
+    };
+    
+    try {
+        if (navigator.share) {
+            await navigator.share(shareData);
+            showNotification('Berhasil dibagikan!');
+        } else {
+            // Fallback: copy to clipboard
+            await navigator.clipboard.writeText(shareData.url);
+            showNotification('Link disalin ke clipboard!');
+        }
+    } catch (err) {
+        if (err.name !== 'AbortError') {
+            // Fallback: copy to clipboard
+            await navigator.clipboard.writeText(shareData.url);
+            showNotification('Link disalin ke clipboard!');
+        }
+    }
+}
+
+// ========== NOTIFICATION ==========
+function showNotification(message) {
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #8B6F47;
+        color: #fff;
+        padding: 15px 25px;
+        border-radius: 10px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        z-index: 10000;
+        animation: slideIn 0.3s ease;
+    `;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.style.animation = 'slideOut 0.3s ease';
+        setTimeout(() => notification.remove(), 300);
+    }, 3000);
+}
+
+// Add animation styles
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideIn {
+        from { transform: translateX(400px); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes slideOut {
+        from { transform: translateX(0); opacity: 1; }
+        to { transform: translateX(400px); opacity: 0; }
+    }
+    .wishlist-btn.active {
+        color: #e74c3c !important;
+    }
+    .wishlist-btn.active i::before {
+        content: '\\f004';
+    }
+`;
+document.head.appendChild(style);
+
+// ========== INITIALIZE ==========
+document.addEventListener('DOMContentLoaded', function() {
+    updateCartCount();
+    updateWishlistCount();
+    
+    // Add click listeners to "Beli Sekarang" buttons
+    document.querySelectorAll('.beli-sekarang-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const productCard = this.closest('.product-card') || this.closest('.modal-content');
+            const productId = productCard.dataset.id || '1';
+            const productName = productCard.querySelector('.product-name')?.textContent || 'Produk';
+            const productPrice = parseInt(productCard.dataset.price) || 0;
+            const productImage = productCard.querySelector('img')?.src || '';
+            
+            addToCart(productId, productName, productPrice, productImage);
+        });
+    });
+    
+    // Add click listeners to wishlist buttons
+    document.querySelectorAll('.wishlist-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const productCard = this.closest('.product-card') || this.closest('.modal-content');
+            const productId = productCard.dataset.id || '1';
+            const productName = productCard.querySelector('.product-name')?.textContent || 'Produk';
+            const productPrice = parseInt(productCard.dataset.price) || 0;
+            const productImage = productCard.querySelector('img')?.src || '';
+            
+            toggleWishlist(productId, productName, productPrice, productImage, this);
+        });
+    });
+    
+    // Add click listeners to share buttons
+    document.querySelectorAll('.share-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const productCard = this.closest('.product-card') || this.closest('.modal-content');
+            const productId = productCard.dataset.id || '1';
+            const productName = productCard.querySelector('.product-name')?.textContent || 'Produk';
+            const productPrice = parseInt(productCard.dataset.price) || 0;
+            
+            shareProduct(productId, productName, productPrice);
+        });
+    });
+});
+</script>
+<script>
+// Inisialisasi keranjang dari localStorage
+let cart = JSON.parse(localStorage.getItem('texcer_cart')) || [];
+
+// Update badge jumlah di navbar
+function updateCartBadge() {
+    const badge = document.querySelector('.cart-count');
+    if (badge) {
+        const total = cart.reduce((sum, item) => sum + item.quantity, 0);
+        badge.textContent = total > 0 ? total : '0';
+        badge.style.display = total > 0 ? 'flex' : 'none';
+    }
+}
+
+// Tambah produk ke keranjang
+function addToCart(id, name, price, image) {
+    // Cek apakah produk sudah ada
+    const existing = cart.find(item => item.id === id);
+    if (existing) {
+        existing.quantity += 1;
+    } else {
+        cart.push({ id, name, price, image, quantity: 1 });
+    }
+    
+    // Simpan ke localStorage
+    localStorage.setItem('texcer_cart', JSON.stringify(cart));
+    updateCartBadge();
+    
+    // Notifikasi
+    showNotification('✅ ' + name + ' ditambahkan ke keranjang!');
+}
+
+// Notifikasi popup
+function showNotification(message) {
+    const notif = document.createElement('div');
+    notif.textContent = message;
+    notif.style.cssText = `
+        position: fixed; top: 80px; right: 20px;
+        background: #2ecc71; color: #fff;
+        padding: 12px 20px; border-radius: 8px;
+        font-weight: 600; z-index: 9999;
+        animation: fadeInOut 2.5s ease forwards;
+    `;
+    document.body.appendChild(notif);
+    setTimeout(() => notif.remove(), 2500);
+}
+
+// CSS untuk animasi notifikasi
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes fadeInOut {
+        0% { opacity: 0; transform: translateY(-20px); }
+        10% { opacity: 1; transform: translateY(0); }
+        80% { opacity: 1; transform: translateY(0); }
+        100% { opacity: 0; transform: translateY(-20px); }
+    }
+`;
+document.head.appendChild(style);
+
+// Jalankan saat halaman selesai dimuat
+document.addEventListener('DOMContentLoaded', () => {
+    updateCartBadge();
+    
+    // Event listener untuk tombol "Beli sekarang" di modal
+    document.querySelectorAll('.beli-sekarang-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            // Cari data produk dari modal parent
+            const modal = this.closest('.modal-content') || this.closest('.card') || this.closest('[data-id]');
+            if (!modal) return;
+            
+            const id = modal.getAttribute('data-id') || modal.dataset.id;
+            const name = modal.querySelector('.product-name')?.textContent || 'Produk';
+            const price = modal.getAttribute('data-price') || modal.dataset.price || 0;
+            const image = modal.querySelector('img')?.src || '';
+            
+            addToCart(id, name, price, image);
+        });
+    });
+});
 </script>
 
 </body>
