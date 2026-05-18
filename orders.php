@@ -241,9 +241,9 @@ $orders = mysqli_query($conn, "SELECT * FROM orders WHERE $whereSQL ORDER BY cre
                                 <td>
                                     <?php
                                     // Get order items
-                                    $items = mysqli_query($conn, "SELECT oi.*, p.name FROM order_items oi LEFT JOIN products p ON oi.product_id = p.id WHERE oi.order_id = {$order['id']}");
+                                    $items = mysqli_query($conn, "SELECT oi.*, oi.product_name as name FROM order_items oi WHERE oi.order_id = {$order['id']}");
                                     while($item = mysqli_fetch_assoc($items)){
-                                        echo "<div>" . htmlspecialchars($item['name'] ?? 'Produk') . " (x{$item['quantity']})</div>";
+                                        echo "<div>" . htmlspecialchars($item['product_name'] ?? 'Produk') . " (x{$item['qty']})</div>";
                                     }
                                     ?>
                                 </td>

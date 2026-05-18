@@ -1,28 +1,33 @@
 <?php
-session_start();
-include 'config.php';
+// ... kode sebelumnya ...
 
-// Inisialisasi cart
-if(!isset($_SESSION['cart'])){
-    $_SESSION['cart'] = [];
+// ✅ Ambil topping yang tersedia untuk produk ini (SESUAI STRUKTUR DB KAMU)
+$toppings = [];
+$toppingQuery = mysqli_query($conn, "
+    SELECT pt.*, t.name, t.price, t.is_available
+    FROM product_toppings pt
+    JOIN toppings t ON pt.topping_id = t.id
+    WHERE pt.product_id = $product_id AND pt.is_available = 1 AND t.is_available = 1
+    ORDER BY t.display_order ASC
+");
+while($row = mysqli_fetch_assoc($toppingQuery)){
+    $toppings[] = $row;
 }
 
-$product_id = (int)$_GET['id'];
-$query = mysqli_query($conn, "SELECT p.*, c.name as category_name 
-                              FROM products p 
-                              LEFT JOIN categories c ON p.category_id = c.id 
-                              WHERE p.id = $product_id");
-$product = mysqli_fetch_assoc($query);
-
-if(!$product){
-    die("Produk tidak ditemukan");
+// ✅ Ambil level pedas yang tersedia untuk produk ini (SESUAI STRUKTUR DB KAMU)
+$spiceLevels = [];
+$levelQuery = mysqli_query($conn, "
+    SELECT pl.*, l.name as level_name, l.level_number, l.price, l.is_available
+    FROM product_levels pl
+    JOIN levels l ON pl.level_id = l.id
+    WHERE pl.product_id = $product_id AND pl.is_available = 1 AND l.is_available = 1
+    ORDER BY l.level_number ASC
+");
+while($row = mysqli_fetch_assoc($levelQuery)){
+    $spiceLevels[] = $row;
 }
 
-// Ambil varian jika ada
-$variants = [];
-if($product['variants']){
-    $variants = explode(',', $product['variants']);
-}
+// ... kode selanjutnya ...
 ?>
 
 <div class="modal fade" id="productModal" tabindex="-1" style="display: block;">
@@ -57,6 +62,69 @@ if($product['variants']){
                             </select>
                         </div>
                         <?php endif; ?>
+
+                        <!-- 🍴 Pilihan Topping -->
+<?php if(!empty($toppings)): ?>
+<div class="mb-3">
+    <label class="form-label fw-bold">🍴 Topping Tambahan:</label>
+    <div class="row g-2" id="toppingOptions">
+        <?php foreach($toppings as $topping): ?>
+        <div class="col-6 col-md-4">
+            <div class="form-check border rounded p-2">
+                <input class="form-check-input topping-checkbox" type="checkbox" 
+                       id="topping_<?= $topping['id'] ?>" 
+                       value="<?= $topping['id'] ?>"
+                       data-name="<?= htmlspecialchars($topping['topping_name']) ?>"
+                       data-price="<?= $topping['price'] ?>">
+                <label class="form-check-label w-100" for="topping_<?= $topping['id'] ?>">
+                    <div class="small fw-bold"><?= htmlspecialchars($topping['topping_name']) ?></div>
+                    <div class="text-primary small">+Rp <?= number_format($topping['price'], 0, ',', '.') ?></div>
+                </label>
+            </div>
+        </div>
+        <?php endforeach; ?>
+    </div>
+</div>
+<?php endif; ?>
+
+<!-- 🌶️ Pilihan Level Pedas -->
+<?php if(!empty($spiceLevels)): ?>
+<div class="mb-3">
+    <label class="form-label fw-bold">🌶️ Level Pedas:</label>
+    <div class="row g-2" id="spiceLevelOptions">
+        <?php foreach($spiceLevels as $level): ?>
+        <div class="col-6 col-md-4">
+            <div class="form-check border rounded p-2">
+                <input class="form-check-input spice-radio" type="radio" 
+                       name="spice_level" 
+                       id="spice_<?= $level['id'] ?>" 
+                       value="<?= $level['id'] ?>"
+                       data-name="<?= htmlspecialchars($level['level_name']) ?>"
+                       data-price="<?= $level['price'] ?>"
+                       <?= $level['level_number'] == 0 ? 'checked' : '' ?>>
+                <label class="form-check-label w-100" for="spice_<?= $level['id'] ?>">
+                    <div class="small fw-bold"><?= htmlspecialchars($level['level_name']) ?></div>
+                    <div class="<?= $level['price'] > 0 ? 'text-primary' : 'text-muted' ?> small">
+                        <?= $level['price'] > 0 ? '+Rp '.number_format($level['price'], 0, ',', '.') : 'Gratis' ?>
+                    </div>
+                </label>
+            </div>
+        </div>
+        <?php endforeach; ?>
+    </div>
+</div>
+<?php endif; ?>
+
+<!-- 💰 Total Harga Dinamis -->
+<?php if(!empty($toppings) || !empty($spiceLevels)): ?>
+<div class="mb-3 p-2 bg-light rounded">
+    <div class="d-flex justify-content-between">
+        <span class="fw-bold">Total:</span>
+        <span class="fw-bold text-primary" id="dynamicTotal">Rp <?= number_format($product['price'], 0, ',', '.') ?></span>
+    </div>
+    <small class="text-muted d-block" id="selectedOptions"></small>
+</div>
+<?php endif; ?>
                         
                         <div class="mb-4">
                             <label class="form-label fw-bold">Jumlah:</label>
@@ -164,4 +232,126 @@ function showStoreInfo(){
 function closeModal(){
     window.history.back();
 }
+
+// Format Rupiah helper
+function formatRupiah(angka) {
+    return new Intl.NumberFormat('id-ID').format(angka);
+}
+
+// Update quantity
+function updateQty(change){
+    let qty = document.getElementById('quantity');
+    let newVal = parseInt(qty.value) + change;
+    if(newVal >= 1) {
+        qty.value = newVal;
+        calculateTotal(); // ✅ Update total saat qty berubah
+    }
+}
+
+// ✅ Hitung total harga dinamis
+function calculateTotal() {
+    let basePrice = <?= $product['price'] ?>;
+    let total = basePrice;
+    let selectedText = [];
+    
+    // Tambah harga topping yang dipilih
+    document.querySelectorAll('.topping-checkbox:checked').forEach(cb => {
+        let price = parseFloat(cb.dataset.price);
+        let name = cb.dataset.name;
+        total += price;
+        selectedText.push(name);
+    });
+    
+    // Tambah harga level pedas yang dipilih
+    let selectedLevel = document.querySelector('.spice-radio:checked');
+    if(selectedLevel) {
+        let price = parseFloat(selectedLevel.dataset.price);
+        let name = selectedLevel.dataset.name;
+        total += price;
+        if(name !== 'Tidak Pedas') selectedText.push(name);
+    }
+    
+    // Kalikan dengan quantity
+    let qty = parseInt(document.getElementById('quantity').value) || 1;
+    total *= qty;
+    
+    // Update tampilan
+    document.getElementById('dynamicTotal').textContent = 'Rp ' + formatRupiah(total);
+    document.getElementById('selectedOptions').textContent = 
+        selectedText.length > 0 ? 'Pilihan: ' + selectedText.join(', ') : '';
+    
+    return total;
+}
+
+// ✅ Tambahkan event listener ke semua input topping & level
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.topping-checkbox, .spice-radio').forEach(input => {
+        input.addEventListener('change', calculateTotal);
+    });
+});
+
+// ✅ Update addToCart agar kirim data topping & level
+function addToCart(){
+    let productId = <?= $product_id ?>;
+    let quantity = document.getElementById('quantity').value;
+    let variant = document.getElementById('variantSelect') ? document.getElementById('variantSelect').value : '';
+    
+    // ✅ Kumpulkan topping yang dipilih
+    let selectedToppings = [];
+    document.querySelectorAll('.topping-checkbox:checked').forEach(cb => {
+        selectedToppings.push({
+            id: cb.value,
+            name: cb.dataset.name,
+            price: cb.dataset.price
+        });
+    });
+    
+    // ✅ Kumpulkan level pedas yang dipilih
+    let selectedSpice = null;
+    let checkedSpice = document.querySelector('.spice-radio:checked');
+    if(checkedSpice) {
+        selectedSpice = {
+            id: checkedSpice.value,
+            name: checkedSpice.dataset.name,
+            price: checkedSpice.dataset.price
+        };
+    }
+    
+    // Buat form dan submit
+    let form = document.createElement('form');
+    form.method = 'POST';
+    form.action = 'cart.php';
+    form.innerHTML = `
+        <input type="hidden" name="add_to_cart" value="1">
+        <input type="hidden" name="product_id" value="${productId}">
+        <input type="hidden" name="quantity" value="${quantity}">
+        <input type="hidden" name="variant" value="${variant}">
+        <input type="hidden" name="toppings" value='${JSON.stringify(selectedToppings)}'>
+        <input type="hidden" name="spice_level" value='${JSON.stringify(selectedSpice)}'>
+        <input type="hidden" name="total_price" value="${calculateTotal()}">
+    `;
+    document.body.appendChild(form);
+    form.submit();
+}
+
+function buyNow(){
+    addToCart();
+    setTimeout(() => {
+        window.location.href = 'checkout.php';
+    }, 500);
+}
+
+function showStoreInfo(){
+    let modal = new bootstrap.Modal(document.getElementById('storeModal'));
+    modal.show();
+}
+
+function closeModal(){
+    // ✅ Ganti history.back() dengan hide modal yang lebih smooth
+    let modalEl = document.getElementById('productModal');
+    let modal = bootstrap.Modal.getInstance(modalEl);
+    if(modal) modal.hide();
+    else window.history.back();
+}
+
 </script>

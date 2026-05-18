@@ -548,6 +548,57 @@ body {
     color: white;
     border-color: var(--primary);
 }
+.buy-modal-overlay{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);
+  z-index:9999;align-items:flex-end;justify-content:center;
+}
+.buy-modal-overlay.show{display:flex;}
+.buy-modal{
+  background:#fff;width:100%;max-width:480px;max-height:90vh;
+  border-radius:18px 18px 0 0;display:flex;flex-direction:column;
+  animation:slideUp .25s ease-out;
+}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.buy-modal-close{
+  position:absolute;right:16px;top:16px;background:#f3f3f3;border:none;
+  width:32px;height:32px;border-radius:50%;font-size:20px;cursor:pointer;z-index:2;
+}
+.buy-modal-header{display:flex;gap:14px;padding:18px;border-bottom:1px solid #eee;}
+.buy-modal-header img{width:80px;height:80px;border-radius:12px;object-fit:cover;background:#f5f5f5;}
+.buy-modal-header h3{margin:0 0 6px;font-size:16px;color:#333;}
+.bm-price{color:#8B5A2B;font-weight:700;font-size:18px;}
+.buy-modal-body{padding:16px 18px;overflow-y:auto;flex:1;}
+.bm-section{margin-bottom:18px;}
+.bm-section h4{margin:0 0 10px;font-size:14px;color:#555;}
+.bm-options{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.bm-option{
+  border:1.5px solid #e5e5e5;border-radius:10px;padding:10px 12px;
+  cursor:pointer;display:flex;justify-content:space-between;align-items:center;
+  font-size:13px;transition:all .15s;background:#fff;
+}
+.bm-option:hover{border-color:#8B5A2B;}
+.bm-option.selected{border-color:#8B5A2B;background:#fdf6ef;color:#8B5A2B;font-weight:600;}
+.bm-option .price{font-size:12px;color:#999;}
+.bm-option.selected .price{color:#8B5A2B;}
+.bm-qty-section{display:flex;justify-content:space-between;align-items:center;}
+.bm-qty{display:flex;align-items:center;gap:14px;}
+.bm-qty button{
+  width:32px;height:32px;border-radius:50%;border:1.5px solid #8B5A2B;
+  background:#fff;color:#8B5A2B;font-size:18px;font-weight:700;cursor:pointer;
+}
+.bm-qty span{font-weight:700;font-size:16px;min-width:24px;text-align:center;}
+#bmNote{width:100%;border:1.5px solid #e5e5e5;border-radius:10px;padding:10px;
+  resize:none;font-family:inherit;font-size:13px;min-height:60px;}
+.buy-modal-footer{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:14px 18px;border-top:1px solid #eee;gap:12px;
+}
+.bm-total{color:#8B5A2B;font-weight:800;font-size:20px;}
+.bm-checkout-btn{
+  background:#8B5A2B;color:#fff;border:none;padding:14px 28px;
+  border-radius:30px;font-weight:700;font-size:15px;cursor:pointer;flex-shrink:0;
+}
+.bm-checkout-btn:hover{background:#6e4621;}
 
 /* Products Grid */
 .products-grid {
@@ -1296,17 +1347,9 @@ body {
         <?php foreach($products as $p): 
         $category = strtolower($p['category'] ?? 'all');
         ?>
-        <div class="product-card" 
-            data-bs-toggle="modal" 
-            data-bs-target="#modalDetail"
-            data-id="<?= $p['id'] ?>"
-            data-name="<?= $p['name'] ?>"
-            data-price="<?= $p['price'] ?>"
-            data-desc="<?= $p['description'] ?>"
-            data-img="<?= $p['image'] ?>"
-            data-category="<?= $category ?>"
-            data-has-variant="<?= $p['has_variant'] ? '1' : '0' ?>"
-            data-variants='<?= $p['has_variant'] ? json_encode($p['variants']) : '[]' ?>'>
+      <div class="product-card" 
+onclick="openDetailModal(<?= $p['id'] ?>, '<?= addslashes($p['name']) ?>', <?= $p['price'] ?>, '<?= addslashes($p['description']) ?>', '<?= $p['image'] ?>', '<?= $category ?>')"
+data-category="<?= $category ?>">
 
             <div class="product-image">
                 <button class="favorite-btn" onclick="toggleFavorite(this, event)">
@@ -1944,7 +1987,6 @@ document.getElementById('trackingInput')?.addEventListener('keypress', function(
      data-price="<?= $produk['harga'] ?>" 
      style="border: none; border-radius: 0;">
             
-            
             <!-- Header dengan back button -->
             <div class="modal-header" style="border-bottom: 1px solid #e0e0e0; padding: 12px 16px; position: sticky; top: 0; background: white; z-index: 100;">
                 <button type="button" class="btn btn-link" data-bs-dismiss="modal" style="text-decoration: none; color: #333; padding: 0; font-size: 1.5rem;">
@@ -2335,7 +2377,7 @@ document.getElementById('trackingInput')?.addEventListener('keypress', function(
                     <input type="hidden" name="name" id="mv-name">
                     <input type="hidden" name="price" id="mv-price">
                     <input type="hidden" name="variant" id="mv-variant">
-                    <button type="button" onclick="addToCart(<?= $product['id'] ?>, document.getElementById('variantSelect')?.value || '')" style="background: none; border: none; cursor: pointer; padding: 8px;">
+                    <button type="button" onclick="openToppingModal(<?= $product['id'] ?>)" style="background: none; border: none; cursor: pointer; padding: 8px;">
                     <i class="fas fa-shopping-cart"></i>
                     <div style="font-size: 0.75rem; margin-top: 2px;">Tambah Keranjang</div>
                     </button>
@@ -3028,23 +3070,6 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-// ========== INITIALIZE ==========
-document.addEventListener('DOMContentLoaded', function() {
-    updateCartCount();
-    updateWishlistCount();
-    
-    // Add click listeners to "Beli Sekarang" buttons
-    document.querySelectorAll('.beli-sekarang-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const productCard = this.closest('.product-card') || this.closest('.modal-content');
-            const productId = productCard.dataset.id || '1';
-            const productName = productCard.querySelector('.product-name')?.textContent || 'Produk';
-            const productPrice = parseInt(productCard.dataset.price) || 0;
-            const productImage = productCard.querySelector('img')?.src || '';
-            
-            addToCart(productId, productName, productPrice, productImage);
-        });
-    });
     
     // Add click listeners to wishlist buttons
     document.querySelectorAll('.wishlist-btn').forEach(btn => {
@@ -3132,28 +3157,631 @@ style.textContent = `
     }
 `;
 document.head.appendChild(style);
-
-// Jalankan saat halaman selesai dimuat
-document.addEventListener('DOMContentLoaded', () => {
-    updateCartBadge();
-    
-    // Event listener untuk tombol "Beli sekarang" di modal
-    document.querySelectorAll('.beli-sekarang-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            // Cari data produk dari modal parent
-            const modal = this.closest('.modal-content') || this.closest('.card') || this.closest('[data-id]');
-            if (!modal) return;
-            
-            const id = modal.getAttribute('data-id') || modal.dataset.id;
-            const name = modal.querySelector('.product-name')?.textContent || 'Produk';
-            const price = modal.getAttribute('data-price') || modal.dataset.price || 0;
-            const image = modal.querySelector('img')?.src || '';
-            
-            addToCart(id, name, price, image);
-        });
-    });
-});
 </script>
 
+<script>
+
+// Panggil fungsi ini dari tombol "Beli sekarang" di kartu produk
+// Contoh: <button onclick="openBuyModal(123)">Beli sekarang</button>
+function openBuyModal(productId){
+  fetch('get_product_options.php?id=' + productId)
+    .then(r => r.json())
+    .then(data => {
+      if(!data.success){ alert(data.message); return; }
+
+      bmState.product = data.product;
+      bmState.productId = data.product.id;
+      bmState.basePrice = parseInt(data.product.harga);
+      bmState.qty = 1;
+      bmState.selectedLevel = null;
+      bmState.selectedToppings = [];
+
+      document.getElementById('bmProductName').textContent = data.product.nama;
+      document.getElementById('bmProductImg').src = data.product.gambar || 'placeholder.jpg';
+      document.getElementById('bmBasePrice').textContent = formatRp(bmState.basePrice);
+      document.getElementById('bmQty').textContent = 1;
+      document.getElementById('bmNote').value = '';
+
+      // Render level
+      const lvlBox = document.getElementById('bmLevels');
+      lvlBox.innerHTML = '';
+      if(data.levels.length === 0){
+        document.getElementById('bmLevelSection').style.display = 'none';
+      } else {
+        document.getElementById('bmLevelSection').style.display = 'block';
+        data.levels.forEach(lv => {
+          const el = document.createElement('div');
+          el.className = 'bm-option';
+          el.dataset.id = lv.id;
+          el.innerHTML = `<span>${lv.nama}</span><span class="price">${lv.harga > 0 ? '+'+formatRp(lv.harga) : 'Gratis'}</span>`;
+          el.onclick = () => selectLevel(lv, el);
+          lvlBox.appendChild(el);
+        });
+      }
+
+      // Render topping
+      const topBox = document.getElementById('bmToppings');
+      topBox.innerHTML = '';
+      if(data.toppings.length === 0){
+        document.getElementById('bmToppingSection').style.display = 'none';
+      } else {
+        document.getElementById('bmToppingSection').style.display = 'block';
+        data.toppings.forEach(tp => {
+          const el = document.createElement('div');
+          el.className = 'bm-option';
+          el.dataset.id = tp.id;
+          el.innerHTML = `<span>${tp.nama}</span><span class="price">+${formatRp(tp.harga)}</span>`;
+          el.onclick = () => toggleTopping(tp, el);
+          topBox.appendChild(el);
+        });
+      }
+
+      updateTotal();
+      document.getElementById('buyModal').classList.add('show');
+    })
+    .catch(err => alert('Gagal memuat data: ' + err));
+}
+
+function closeBuyModal(){
+  document.getElementById('buyModal').classList.remove('show');
+}
+
+function selectLevel(lv, el){
+  document.querySelectorAll('#bmLevels .bm-option').forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+  bmState.selectedLevel = lv;
+  updateTotal();
+}
+
+function toggleTopping(tp, el){
+  const idx = bmState.selectedToppings.findIndex(x => x.id === tp.id);
+  if(idx >= 0){
+    bmState.selectedToppings.splice(idx, 1);
+    el.classList.remove('selected');
+  } else {
+    bmState.selectedToppings.push(tp);
+    el.classList.add('selected');
+  }
+  updateTotal();
+}
+
+function changeQty(delta){
+  bmState.qty = Math.max(1, bmState.qty + delta);
+  document.getElementById('bmQty').textContent = bmState.qty;
+  updateTotal();
+}
+
+function updateTotal(){
+  let extra = 0;
+  if(bmState.selectedLevel) extra += parseInt(bmState.selectedLevel.harga);
+  bmState.selectedToppings.forEach(t => extra += parseInt(t.harga));
+  const total = (bmState.basePrice + extra) * bmState.qty;
+  document.getElementById('bmTotal').textContent = formatRp(total);
+}
+
+function formatRp(n){
+  return 'Rp ' + Number(n).toLocaleString('id-ID');
+}
+
+function checkoutNow(){
+  // Validasi: kalau ada level wajib dipilih
+  const lvlSection = document.getElementById('bmLevelSection');
+  if(lvlSection.style.display !== 'none' && !bmState.selectedLevel){
+    alert('Silakan pilih level pedas terlebih dahulu');
+    return;
+  }
+
+  const payload = {
+    product_id: bmState.productId,
+    qty: bmState.qty,
+    level_id: bmState.selectedLevel ? bmState.selectedLevel.id : null,
+    topping_ids: bmState.selectedToppings.map(t => t.id),
+    note: document.getElementById('bmNote').value
+  };
+
+  fetch('checkout.php', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(payload)
+  })
+  .then(r => r.json())
+  .then(res => {
+    if(res.success){
+      alert('Pesanan berhasil dibuat! No: ' + res.order_id);
+      closeBuyModal();
+      // window.location.href = 'pesanan.php?id=' + res.order_id;
+    } else {
+      alert('Gagal: ' + res.message);
+    }
+  });
+}
+
+// ============================================================
+// STATE
+// ============================================================
+var dmState = {
+  id: null, name: '', price: 0, image: '', category: '',
+  action: 'cart'
+};
+var omState = {
+  id: null, name: '', basePrice: 0, category: '',
+  qty: 1, suhu: null, level: null, levelName: '',
+  toppings: {}, action: 'cart'
+};
+
+// ============================================================
+// FORMAT RUPIAH
+// ============================================================
+function dmFmt(n) {
+  return 'Rp ' + parseInt(n).toLocaleString('id-ID');
+}
+
+// ============================================================
+// MODAL 1: DETAIL PRODUK
+// ============================================================
+function openDetailModal(id, name, price, desc, image, category) {
+  dmState = { id:id, name:name, price:price, image:image, category:category, action:'cart' };
+
+  document.getElementById('dmImg').src       = image || 'assets/images/placeholder.jpg';
+  document.getElementById('dmName').textContent  = name;
+  document.getElementById('dmDesc').textContent  = desc || '';
+  document.getElementById('dmPrice').textContent = dmFmt(price);
+
+  document.getElementById('detailModal').style.display = 'flex';
+}
+
+function closeDetailModal() {
+  document.getElementById('detailModal').style.display = 'none';
+}
+
+// Tutup saat klik overlay
+document.getElementById('detailModal').addEventListener('click', function(e) {
+  if (e.target === this) closeDetailModal();
+});
+
+// Tombol Keranjang / Beli Sekarang dari modal detail
+function dmOpenOrder(action) {
+  closeDetailModal();
+  omState.action    = action;
+  omState.id        = dmState.id;
+  omState.name      = dmState.name;
+  omState.basePrice = parseInt(dmState.price);
+  omState.category  = dmState.category;
+  omState.qty       = 1;
+  omState.suhu      = null;
+  omState.level     = null;
+  omState.levelName = '';
+  omState.toppings  = {};
+
+  // Set header modal order
+  document.getElementById('omImg').src             = dmState.image || 'assets/images/placeholder.jpg';
+  document.getElementById('omName').textContent     = dmState.name;
+  document.getElementById('omBaseLabel').textContent = 'Harga dasar: ' + dmFmt(dmState.price);
+  document.getElementById('omBasePrice').textContent = dmFmt(dmState.price);
+  document.getElementById('omQty').textContent       = 1;
+  document.getElementById('omNote').value            = '';
+  document.getElementById('omBreakdown').innerHTML   = '';
+  document.getElementById('omLevelWarn').style.display = 'none';
+  document.getElementById('omSuhuWarn').style.display  = 'none';
+
+  // Tombol label
+  document.getElementById('omSubmitLabel').textContent =
+    action === 'buy' ? '⚡ Beli Sekarang' : '🛒 Tambah ke Keranjang';
+
+  // Tentukan section yang tampil berdasarkan kategori
+  var cat = (dmState.category || '').toLowerCase();
+  var isMie     = cat === 'mie';
+  var isMinuman = cat === 'minuman';
+  var isMercon  = cat === 'mercon';
+  var isDimsum  = cat === 'dimsum';
+
+  // Suhu: hanya minuman
+  document.getElementById('omSuhuSection').style.display  = isMinuman ? 'block' : 'none';
+  // Level: mie & mercon
+  document.getElementById('omLevelSection').style.display = (isMie || isMercon) ? 'block' : 'none';
+  // Topping: mie, mercon, dimsum
+  var showTopping = isMie || isMercon || isDimsum;
+  document.getElementById('omToppingSection').style.display = showTopping ? 'block' : 'none';
+
+  // Reset pilihan suhu visual
+  document.querySelectorAll('#omSuhuSection [onclick]').forEach(function(el) {
+    el.style.borderColor = '#e8e8e8';
+    el.style.background  = '#fff';
+    el.querySelector('div:last-child').style.color = '#1a1a1a';
+  });
+
+  // Reset pilihan level visual
+  document.querySelectorAll('#omLevelList [onclick]').forEach(function(el) {
+    el.style.borderColor = '#e8e8e8';
+    el.style.background  = '#fff';
+    el.querySelector('div:last-child').style.color = '#1a1a1a';
+  });
+
+  // Load topping dari API jika kategori punya topping
+  if (showTopping) {
+    document.getElementById('omToppingList').innerHTML =
+      '<div style="text-align:center;padding:20px;color:#aaa;font-size:13px;">Memuat topping...</div>';
+
+    fetch('api_topping.php?action=get&product_id=' + dmState.id)
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.toppings && data.toppings.length > 0) {
+          omRenderToppings(data.toppings);
+        } else {
+          document.getElementById('omToppingList').innerHTML =
+            '<div style="font-size:13px;color:#aaa;text-align:center;padding:10px;">Tidak ada topping tersedia</div>';
+        }
+      })
+      .catch(function() {
+        document.getElementById('omToppingList').innerHTML = '';
+      });
+  }
+
+  omUpdatePrice();
+  document.getElementById('orderModal').style.display = 'flex';
+}
+
+function closeOrderModal() {
+  document.getElementById('orderModal').style.display = 'none';
+}
+
+document.getElementById('orderModal').addEventListener('click', function(e) {
+  if (e.target === this) closeOrderModal();
+});
+
+// ============================================================
+// RENDER TOPPING
+// ============================================================
+function omRenderToppings(toppings) {
+  var html = '';
+  for (var i = 0; i < toppings.length; i++) {
+    var t   = toppings[i];
+    var sel = !!omState.toppings[t.id];
+    html += '<div onclick="omToggleTopping(' + t.id + ', \'' + t.name + '\', ' + t.price + ', this)"'
+          + ' style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:10px;'
+          + 'border:1.5px solid ' + (sel ? '#8B5A2B' : '#e8e8e8') + ';cursor:pointer;background:' + (sel ? '#FFF8EE' : '#fff') + ';">'
+          + '<div style="display:flex;align-items:center;gap:10px;">'
+          + '<div style="width:20px;height:20px;border-radius:5px;border:2px solid ' + (sel ? '#8B5A2B' : '#ccc') + ';background:' + (sel ? '#8B5A2B' : 'transparent') + ';display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;">'
+          + (sel ? '✓' : '') + '</div>'
+          + '<span style="font-size:13px;color:#1a1a1a;">' + t.name + '</span>'
+          + '</div>'
+          + '<span style="font-size:13px;font-weight:600;color:' + (sel ? '#8B5A2B' : '#888') + ';">+' + dmFmt(t.price) + '</span>'
+          + '</div>';
+  }
+  // Simpan data topping ke state untuk toggle
+  window._omToppingsData = toppings;
+  document.getElementById('omToppingList').innerHTML = html;
+}
+
+// ============================================================
+// INTERAKSI
+// ============================================================
+function omPickSuhu(suhu, el) {
+  omState.suhu = suhu;
+  document.getElementById('omSuhuWarn').style.display = 'none';
+  document.querySelectorAll('#omSuhuSection [onclick]').forEach(function(e) {
+    e.style.borderColor = '#e8e8e8';
+    e.style.background  = '#fff';
+    e.querySelector('div:last-child').style.color = '#1a1a1a';
+  });
+  el.style.borderColor = '#8B5A2B';
+  el.style.background  = '#FFF8EE';
+  el.querySelector('div:last-child').style.color = '#8B5A2B';
+  omUpdatePrice();
+}
+
+function omPickLevel(id, name, el) {
+  omState.level     = id;
+  omState.levelName = name;
+  document.getElementById('omLevelWarn').style.display = 'none';
+  document.querySelectorAll('#omLevelList [onclick]').forEach(function(e) {
+    e.style.borderColor = '#e8e8e8';
+    e.style.background  = '#fff';
+    e.querySelector('div:last-child').style.color = '#1a1a1a';
+  });
+  el.style.borderColor = '#8B5A2B';
+  el.style.background  = '#8B5A2B';
+  el.querySelector('div:last-child').style.color = '#fff';
+  omUpdatePrice();
+}
+
+function omToggleTopping(id, name, price, el) {
+  omState.toppings[id] = omState.toppings[id] ? false : {id:id, name:name, price:price};
+  if (window._omToppingsData) omRenderToppings(window._omToppingsData);
+  omUpdatePrice();
+}
+
+function omChangeQty(d) {
+  omState.qty = Math.max(1, omState.qty + d);
+  document.getElementById('omQty').textContent = omState.qty;
+  omUpdatePrice();
+}
+
+// ============================================================
+// UPDATE HARGA
+// ============================================================
+function omUpdatePrice() {
+  var base     = omState.basePrice;
+  var topSum   = 0;
+  var breakdown = '';
+
+  for (var id in omState.toppings) {
+    if (omState.toppings[id]) {
+      var t = omState.toppings[id];
+      topSum += parseInt(t.price);
+      breakdown += '<div style="display:flex;justify-content:space-between;margin-top:4px;">'
+                 + '<span style="font-size:12px;color:#888;">+ ' + t.name + '</span>'
+                 + '<span style="font-size:12px;color:#8B5A2B;">+' + dmFmt(t.price) + '</span>'
+                 + '</div>';
+    }
+  }
+
+  if (omState.suhu) {
+    breakdown += '<div style="display:flex;justify-content:space-between;margin-top:4px;">'
+               + '<span style="font-size:12px;color:#888;">Suhu: ' + omState.suhu + '</span>'
+               + '<span style="font-size:12px;color:#888;">Gratis</span></div>';
+  }
+
+  if (omState.level) {
+    breakdown += '<div style="display:flex;justify-content:space-between;margin-top:4px;">'
+               + '<span style="font-size:12px;color:#888;">Level: ' + omState.levelName + '</span>'
+               + '<span style="font-size:12px;color:#888;">Gratis</span></div>';
+  }
+
+  var perPortion = base + topSum;
+  var total      = perPortion * omState.qty;
+
+  document.getElementById('omBreakdown').innerHTML    = breakdown;
+  document.getElementById('omPerPortion').textContent = dmFmt(perPortion);
+  document.getElementById('omTotal').textContent      = dmFmt(total);
+}
+
+// ============================================================
+// SUBMIT ORDER
+// ============================================================
+function omSubmit() {
+  var cat       = (omState.category || '').toLowerCase();
+  var isMie     = cat === 'mie';
+  var isMinuman = cat === 'minuman';
+  var isMercon  = cat === 'mercon';
+
+  // Validasi suhu
+  if (isMinuman && !omState.suhu) {
+    document.getElementById('omSuhuWarn').style.display = 'block';
+    return;
+  }
+
+  // Validasi level
+  if ((isMie || isMercon) && !omState.level) {
+    document.getElementById('omLevelWarn').style.display = 'block';
+    return;
+  }
+
+  // Kumpulkan topping ids
+  var toppingIds = [];
+  for (var id in omState.toppings) {
+    if (omState.toppings[id]) toppingIds.push(id);
+  }
+
+  // Hitung total
+  var topSum = 0;
+  for (var id2 in omState.toppings) {
+    if (omState.toppings[id2]) topSum += parseInt(omState.toppings[id2].price);
+  }
+  var total = (omState.basePrice + topSum) * omState.qty;
+
+  var fd = new FormData();
+  fd.append('action',      'add_cart');
+  fd.append('product_id',  omState.id);
+  fd.append('qty',         omState.qty);
+  fd.append('level_id',    omState.level || '');
+  fd.append('suhu',        omState.suhu  || '');
+  fd.append('note',        document.getElementById('omNote').value);
+  fd.append('topping_ids', JSON.stringify(toppingIds));
+
+  document.getElementById('omSubmitBtn').disabled = true;
+
+  fetch('api_topping.php', { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success) {
+        closeOrderModal();
+        if (omState.action === 'buy') {
+          window.location.href = 'checkout.php';
+        } else {
+          // Update badge keranjang
+          var badge = document.querySelector('.cart-count');
+          if (badge) {
+            var cur = parseInt(badge.textContent) || 0;
+            badge.textContent = cur + omState.qty;
+            badge.style.display = 'flex';
+          }
+          // Notifikasi
+          var n = document.createElement('div');
+          n.textContent = '✅ ' + omState.name + ' ditambahkan ke keranjang!';
+          n.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:10px 20px;border-radius:99px;font-size:13px;z-index:99999;white-space:nowrap;';
+          document.body.appendChild(n);
+          setTimeout(function() { n.remove(); }, 2500);
+        }
+      } else {
+        alert(data.error || 'Terjadi kesalahan');
+      }
+    })
+    .catch(function() { alert('Gagal menghubungi server'); })
+    .finally(function() {
+      document.getElementById('omSubmitBtn').disabled = false;
+    });
+}
+</script>
+
+<?php
+// modal_detail_lengkap.php
+// Taruh sebelum </body> di index.php
+// GANTIKAN <?php include 'modal_topping.php'; ?> dengan file ini
+?>
+
+<!-- ========================================
+     MODAL 1: DETAIL PRODUK
+     Muncul pertama saat kartu diklik
+     ======================================== -->
+<div id="detailModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:9000; align-items:flex-end; justify-content:center;">
+  <div style="background:#fff; border-radius:20px 20px 0 0; width:100%; max-width:480px; max-height:92vh; display:flex; flex-direction:column; animation:dmSlideUp .25s ease-out;">
+
+    <!-- Gambar produk -->
+    <div style="position:relative; height:220px; flex-shrink:0; overflow:hidden; border-radius:20px 20px 0 0;">
+      <img id="dmImg" src="" alt="" style="width:100%; height:100%; object-fit:cover;">
+      <div style="position:absolute; inset:0; background:linear-gradient(to top, rgba(0,0,0,0.4), transparent);"></div>
+      <button onclick="closeDetailModal()" style="position:absolute; top:14px; right:14px; width:34px; height:34px; border-radius:50%; border:none; background:rgba(255,255,255,0.9); font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center;">×</button>
+    </div>
+
+    <!-- Info produk -->
+    <div style="padding:18px 20px; flex:1; overflow-y:auto;">
+      <h3 id="dmName" style="margin:0 0 6px; font-size:18px; font-weight:700; color:#1a1a1a;"></h3>
+      <p id="dmDesc" style="margin:0 0 14px; font-size:13px; color:#888; line-height:1.6;"></p>
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 0; border-top:1px solid #f0f0f0;">
+        <span style="font-size:13px; color:#888;">Harga</span>
+        <span id="dmPrice" style="font-size:20px; font-weight:700; color:#8B5A2B;"></span>
+      </div>
+    </div>
+
+    <!-- Tombol aksi -->
+    <div style="padding:14px 20px; border-top:1px solid #f0f0f0; display:flex; gap:10px; flex-shrink:0;">
+      <button onclick="dmOpenOrder('cart')" style="flex:1; padding:13px; background:#fff; color:#8B5A2B; border:2px solid #8B5A2B; border-radius:12px; font-size:14px; font-weight:600; cursor:pointer;">
+        🛒 Keranjang
+      </button>
+      <button onclick="dmOpenOrder('buy')" style="flex:2; padding:13px; background:#8B5A2B; color:#fff; border:none; border-radius:12px; font-size:14px; font-weight:600; cursor:pointer;">
+        ⚡ Beli Sekarang
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ========================================
+     MODAL 2: PILIH TOPPING / LEVEL / SUHU
+     Muncul setelah klik Keranjang/Beli
+     ======================================== -->
+<div id="orderModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:9999; align-items:flex-end; justify-content:center;">
+  <div style="background:#fff; border-radius:20px 20px 0 0; width:100%; max-width:480px; max-height:92vh; display:flex; flex-direction:column; animation:dmSlideUp .25s ease-out;">
+
+    <!-- Header -->
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-bottom:1px solid #f0f0f0; flex-shrink:0;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <img id="omImg" src="" alt="" style="width:44px; height:44px; border-radius:10px; object-fit:cover; background:#f5f5f5;">
+        <div>
+          <p id="omName" style="margin:0; font-size:15px; font-weight:600; color:#1a1a1a;"></p>
+          <p id="omBaseLabel" style="margin:0; font-size:12px; color:#888;"></p>
+        </div>
+      </div>
+      <button onclick="closeOrderModal()" style="background:none; border:none; font-size:22px; cursor:pointer; color:#888;">×</button>
+    </div>
+
+    <!-- Body -->
+    <div style="overflow-y:auto; padding:14px 18px; flex:1;">
+
+      <!-- Ringkasan harga -->
+      <div style="background:#FFF8EE; border:1px solid #F5DEB3; border-radius:10px; padding:10px 14px; margin-bottom:16px;">
+        <div style="display:flex; justify-content:space-between; font-size:12px; color:#888; margin-bottom:4px;">
+          <span>Harga dasar</span>
+          <span id="omBasePrice">Rp 0</span>
+        </div>
+        <div id="omBreakdown"></div>
+        <div style="border-top:1px dashed #F5DEB3; margin-top:8px; padding-top:8px; display:flex; justify-content:space-between;">
+          <span style="font-size:13px; font-weight:600; color:#1a1a1a;">Total 1 porsi</span>
+          <span id="omPerPortion" style="font-size:13px; font-weight:600; color:#8B5A2B;">Rp 0</span>
+        </div>
+      </div>
+
+      <!-- SUHU (khusus minuman) -->
+      <div id="omSuhuSection" style="display:none; margin-bottom:18px;">
+        <div style="display:flex; align-items:center; gap:6px; margin-bottom:10px;">
+          <span style="background:#E3F2FD; color:#1565C0; font-size:11px; font-weight:600; padding:2px 9px; border-radius:99px;">Wajib</span>
+          <span style="font-size:14px; font-weight:600; color:#1a1a1a;">Suhu</span>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <div onclick="omPickSuhu('Es', this)" style="flex:1; padding:12px; border-radius:10px; border:1.5px solid #e8e8e8; cursor:pointer; text-align:center;">
+            <div style="font-size:22px;">🧊</div>
+            <div style="font-size:13px; font-weight:600; margin-top:4px;">Es</div>
+          </div>
+          <div onclick="omPickSuhu('Hangat', this)" style="flex:1; padding:12px; border-radius:10px; border:1.5px solid #e8e8e8; cursor:pointer; text-align:center;">
+            <div style="font-size:22px;">☕</div>
+            <div style="font-size:13px; font-weight:600; margin-top:4px;">Hangat</div>
+          </div>
+        </div>
+        <p id="omSuhuWarn" style="display:none; color:#e53935; font-size:12px; margin:6px 0 0;">Pilih suhu dulu ya!</p>
+      </div>
+
+      <!-- LEVEL PEDAS (khusus mie & mercon) -->
+      <div id="omLevelSection" style="display:none; margin-bottom:18px;">
+        <div style="display:flex; align-items:center; gap:6px; margin-bottom:10px;">
+          <span style="background:#FBE9E7; color:#BF360C; font-size:11px; font-weight:600; padding:2px 9px; border-radius:99px;">Wajib</span>
+          <span style="font-size:14px; font-weight:600; color:#1a1a1a;">Level Pedas</span>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px;" id="omLevelList">
+          <?php 
+          $levels_fix = [
+            ['id'=>1,'nama'=>'Level 1','icon'=>'🌶️'],
+            ['id'=>2,'nama'=>'Level 2','icon'=>'🌶️🌶️'],
+            ['id'=>3,'nama'=>'Level 3','icon'=>'🌶️🌶️🌶️'],
+            ['id'=>4,'nama'=>'Level 4','icon'=>'🔥🔥'],
+            ['id'=>5,'nama'=>'Level 5','icon'=>'💀'],
+          ];
+          foreach($levels_fix as $lv): ?>
+          <div onclick="omPickLevel(<?= $lv['id'] ?>, '<?= $lv['nama'] ?>', this)" 
+               style="padding:8px 14px; border-radius:10px; border:1.5px solid #e8e8e8; cursor:pointer; text-align:center; min-width:80px;">
+            <div style="font-size:16px;"><?= $lv['icon'] ?></div>
+            <div style="font-size:12px; font-weight:600; margin-top:2px; color:#1a1a1a;"><?= $lv['nama'] ?></div>
+          </div>
+          <?php endforeach; ?>
+        </div>
+        <p id="omLevelWarn" style="display:none; color:#e53935; font-size:12px; margin:6px 0 0;">Pilih level pedas dulu ya!</p>
+      </div>
+
+      <!-- TOPPING (mie, mercon, dimsum) -->
+      <div id="omToppingSection" style="display:none; margin-bottom:18px;">
+        <div style="display:flex; align-items:center; gap:6px; margin-bottom:10px;">
+          <span style="background:#FFF3E0; color:#E65100; font-size:11px; font-weight:600; padding:2px 9px; border-radius:99px;">Pilihan</span>
+          <span style="font-size:14px; font-weight:600; color:#1a1a1a;">Topping Tambahan</span>
+        </div>
+        <div id="omToppingList" style="display:flex; flex-direction:column; gap:8px;"></div>
+      </div>
+
+      <!-- CATATAN -->
+      <div style="margin-bottom:16px;">
+        <p style="margin:0 0 6px; font-size:13px; font-weight:600; color:#1a1a1a;">Catatan (opsional)</p>
+        <textarea id="omNote" placeholder="Contoh: tidak pakai bawang..." style="width:100%; padding:10px; border:1.5px solid #e8e8e8; border-radius:10px; font-size:13px; resize:none; min-height:60px; font-family:inherit;"></textarea>
+      </div>
+
+      <!-- JUMLAH -->
+      <div>
+        <p style="margin:0 0 8px; font-size:14px; font-weight:600; color:#1a1a1a;">Jumlah</p>
+        <div style="display:flex; align-items:center; gap:14px;">
+          <button onclick="omChangeQty(-1)" style="width:36px; height:36px; border-radius:50%; border:1.5px solid #ddd; background:#fff; font-size:20px; cursor:pointer; line-height:1; color:#1a1a1a;">−</button>
+          <span id="omQty" style="font-size:16px; font-weight:600; min-width:24px; text-align:center; color:#1a1a1a;">1</span>
+          <button onclick="omChangeQty(1)" style="width:36px; height:36px; border-radius:50%; border:none; background:#8B5A2B; font-size:20px; cursor:pointer; line-height:1; color:#fff;">+</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div style="padding:12px 18px; border-top:1px solid #f0f0f0; flex-shrink:0;">
+      <button id="omSubmitBtn" onclick="omSubmit()" style="width:100%; padding:14px; background:#8B5A2B; color:#fff; border:none; border-radius:12px; font-size:15px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:space-between;">
+        <span id="omSubmitLabel">Tambah ke Keranjang</span>
+        <span id="omTotal">Rp 0</span>
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<style>
+@keyframes dmSlideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+</style>
+
+<?php include 'modal_detail_lengkap.php'; ?>
 </body>
 </html>
