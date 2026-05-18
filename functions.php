@@ -1,59 +1,37 @@
 <?php
-// Fungsi buat notifikasi
-function createNotification($conn, $user_phone, $order_id, $title, $message, $type = 'order'){
-    $user_phone = mysqli_real_escape_string($conn, $user_phone);
-    $order_id = (int)$order_id;
-    $title = mysqli_real_escape_string($conn, $title);
-    $message = mysqli_real_escape_string($conn, $message);
-    $type = mysqli_real_escape_string($conn, $type);
+// functions.php
+
+/**
+ * Fungsi Notifikasi Pesanan Dibuat
+ * Ini adalah placeholder. Anda bisa mengisinya dengan logika kirim WhatsApp/API nanti.
+ */
+function notifyOrderCreated($conn, $phone, $order_id, $order_number) {
+    // Contoh: Catat log atau kirim API notification
+    // $message = "Pesanan Baru #$order_number telah dibuat.";
+    // kirimWhatsApp($phone, $message); 
     
-    $sql = "INSERT INTO notifications (user_phone, order_id, title, message, type) 
-            VALUES ('$user_phone', '$order_id', '$title', '$message', '$type')";
-    
-    return mysqli_query($conn, $sql);
+    // Untuk saat ini, biarkan kosong agar tidak error
+    return true;
 }
 
-// Notifikasi saat pesanan dibuat
-function notifyOrderCreated($conn, $user_phone, $order_id, $order_number){
-    createNotification(
-        $conn,
-        $user_phone,
-        $order_id,
-        "Pesanan dibuat",
-        "Pesanan Anda {$order_number} sudah masuk. Terima kasih sudah belanja di platform kami!"
-    );
+/**
+ * Fungsi Notifikasi Pesanan Dikirim (Jika dibutuhkan di admin)
+ */
+function notifyOrderShipped($conn, $phone, $order_id, $resi_number) {
+    return true;
 }
 
-// Notifikasi pesanan dikirim
-function notifyOrderShipped($conn, $user_phone, $order_id, $resi_number, $courier = 'J&T Express'){
-    createNotification(
-        $conn,
-        $user_phone,
-        $order_id,
-        "Pesanan dikirim",
-        "Paket dengan nomor resi {$resi_number} sudah dikirim dan akan diantarkan oleh {$courier}."
-    );
+/**
+ * Fungsi Notifikasi COD (Jika dibutuhkan di admin)
+ */
+function notifyCODPayment($conn, $phone, $order_id, $total, $resi_number) {
+    return true;
 }
 
-// Notifikasi paket diantar
-function notifyOrderDelivered($conn, $user_phone, $order_id, $resi_number){
-    createNotification(
-        $conn,
-        $user_phone,
-        $order_id,
-        "Paket diantar",
-        "Paket {$resi_number} Anda diantarkan."
-    );
-}
-
-// Notifikasi COD
-function notifyCODPayment($conn, $user_phone, $order_id, $total, $resi_number){
-    createNotification(
-        $conn,
-        $user_phone,
-        $order_id,
-        "Paket Anda dengan metode bayar di tempat",
-        "Siapkan dana sebesar Rp" . number_format($total, 0, ',', '.') . " untuk membayar pesanan dengan nomor resi {$resi_number} yang akan diantarkan oleh J&T Express."
-    );
+/**
+ * Fungsi Notifikasi Pesanan Selesai (Jika dibutuhkan di admin)
+ */
+function notifyOrderDelivered($conn, $phone, $order_id, $resi_number) {
+    return true;
 }
 ?>

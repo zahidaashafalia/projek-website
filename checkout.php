@@ -1,6 +1,23 @@
 <?php 
 include 'config.php'; 
-include 'functions.php';
+
+if (!function_exists('notifyOrderCreated')) {
+    function notifyOrderCreated($conn, $phone, $order_id, $order_number) {
+        // Di sini Anda bisa menambahkan logika kirim WhatsApp/API Notifikasi nanti
+        // Untuk sekarang, kita biarkan kosong agar tidak error
+        return true;
+    }
+}
+
+if (!function_exists('notifyOrderShipped')) {
+    function notifyOrderShipped($conn, $phone, $order_id, $resi_number) { return true; }
+}
+if (!function_exists('notifyCODPayment')) {
+    function notifyCODPayment($conn, $phone, $order_id, $total, $resi_number) { return true; }
+}
+if (!function_exists('notifyOrderDelivered')) {
+    function notifyOrderDelivered($conn, $phone, $order_id, $resi_number) { return true; }
+}
 
 $grand_total = 0;
 $total_items = 0;

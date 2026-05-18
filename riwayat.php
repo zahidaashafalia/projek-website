@@ -2,7 +2,7 @@
 // Hapus atau comment session_start() jika sudah ada di config.php
 // session_start(); 
 include 'config.php';
-include 'functions.php';
+
 
 // Ambil data pesanan dari database
 $orders = [];

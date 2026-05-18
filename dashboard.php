@@ -274,6 +274,10 @@ $recentOrders = mysqli_query($conn, "SELECT * FROM orders ORDER BY created_at DE
     <!-- ✅ MENU BARU: Kelola Gambar -->
     <li><a href="manage-images.php" class="<?= ($currentPage ?? '') == 'manage-images.php' ? 'active' : '' ?>"><i class="fas fa-images"></i><span>Kelola Gambar</span></a></li>
     
+    <li><a href="admin_topping.php" class="<?= ($currentPage ?? '') == 'admin_topping.php' ? 'active' : '' ?>">
+    <i class="fas fa-pepper-hot"></i><span>Topping & Level</span>
+</a></li>
+
     <li><a href="settings.php"><i class="fas fa-cog"></i><span>Pengaturan</span></a></li>
 </ul>
 </aside>

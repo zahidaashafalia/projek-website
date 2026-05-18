@@ -239,8 +239,10 @@ while($l = mysqli_fetch_assoc($all_levels_q)) $all_levels[] = $l;
         <li><a href="categories.php"><i class="fas fa-tags"></i><span>Kategori</span></a></li>
         <li><a href="customers.php"><i class="fas fa-users"></i><span>Pelanggan</span></a></li>
         <li><a href="manage-images.php"><i class="fas fa-images"></i><span>Kelola Gambar</span></a></li>
-        <li><a href="toppings.php"><i class="fas fa-drumstick-bite"></i><span>Master Topping</span></a></li>
-        <li><a href="levels.php"><i class="fas fa-fire"></i><span>Master Level</span></a></li>
+        <li><a href="admin_topping.php" class="<?= ($currentPage ?? '') == 'admin_topping.php' ? 'active' : '' ?>">
+    <i class="fas fa-pepper-hot"></i><span>Topping & Level</span>
+</a></li>
+
         <li><a href="settings.php"><i class="fas fa-cog"></i><span>Pengaturan</span></a></li>
     </ul>
 </aside>

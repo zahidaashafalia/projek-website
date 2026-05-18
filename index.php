@@ -1,5 +1,4 @@
 <?php include 'config.php';
-include 'functions.php';
 
 // 🔥 AMBIL SETTINGS + STORE PROFILE DARI DATABASE 🔥
 $settings = [];
@@ -113,6 +112,30 @@ while($row = mysqli_fetch_assoc($result)){
         'variants' => []
     ];
 }
+// 🔥 AMBIL ULASAN UNTUK SETIAP PRODUK
+foreach($products as $k => $p){
+    $pid = (int)$p['id'];
+    
+    // Query untuk mengambil ulasan berdasarkan product_id
+    // Kita ambil maksimal 3 ulasan terbaru per produk
+    $review_query = mysqli_query($conn, "
+        SELECT rating, review_text, review_image, created_at 
+        FROM reviews 
+        WHERE product_id = $pid 
+        ORDER BY created_at DESC 
+        LIMIT 3
+    ");
+    
+    $reviews = [];
+    if ($review_query) {
+        while($rev = mysqli_fetch_assoc($review_query)) {
+            $reviews[] = $rev;
+        }
+    }
+    
+    // Simpan array ulasan ke dalam array produk
+    $products[$k]['reviews'] = $reviews;
+}
 // 🔥 Ambil toppings & levels untuk setiap produk
 foreach($products as $k => $p){
     $pid = (int)$p['id'];
@@ -122,23 +145,23 @@ foreach($products as $k => $p){
         SELECT t.id, t.name, t.price
         FROM product_toppings pt
         JOIN toppings t ON t.id = pt.topping_id
-        WHERE pt.product_id = $pid AND t.is_available = 1
-        ORDER BY t.display_order
+        WHERE pt.product_id = $pid AND t.is_active = 1
+        ORDER BY t.name ASC
     ");
     $toppings = [];
-    while($tr = mysqli_fetch_assoc($t_query)) $toppings[] = $tr;
+    if($t_query) while($tr = mysqli_fetch_assoc($t_query)) $toppings[] = $tr;
     $products[$k]['toppings'] = $toppings;
     
     // Levels
     $l_query = mysqli_query($conn, "
-        SELECT l.id, l.name, l.extra_price
+        SELECT l.id, l.name, l.price
         FROM product_levels pl
         JOIN levels l ON l.id = pl.level_id
-        WHERE pl.product_id = $pid AND l.is_available = 1
-        ORDER BY l.display_order
+        WHERE pl.product_id = $pid AND l.is_active = 1
+        ORDER BY l.sort_order ASC, l.id ASC
     ");
     $levels = [];
-    while($lr = mysqli_fetch_assoc($l_query)) $levels[] = $lr;
+    if($l_query) while($lr = mysqli_fetch_assoc($l_query)) $levels[] = $lr;
     $products[$k]['levels'] = $levels;
 }
 $currentPage = basename($_SERVER['PHP_SELF']);
@@ -1348,8 +1371,18 @@ body {
         $category = strtolower($p['category'] ?? 'all');
         ?>
       <div class="product-card" 
-onclick="openDetailModal(<?= $p['id'] ?>, '<?= addslashes($p['name']) ?>', <?= $p['price'] ?>, '<?= addslashes($p['description']) ?>', '<?= $p['image'] ?>', '<?= $category ?>')"
-data-category="<?= $category ?>">
+data-bs-toggle="modal"
+data-bs-target="#modalDetail"
+data-id="<?= $p['id'] ?>"
+data-name="<?= $p['name'] ?>"
+data-price="<?= $p['price'] ?>"
+data-desc="<?= $p['description'] ?>"
+data-img="<?= $p['image'] ?>"
+data-category="<?= $category ?>"
+data-has-variant="0"
+data-variants='[]'
+data-toppings='<?= htmlspecialchars(json_encode($p['toppings']), ENT_QUOTES) ?>'
+data-levels='<?= htmlspecialchars(json_encode($p['levels']), ENT_QUOTES) ?>'>
 
             <div class="product-image">
                 <button class="favorite-btn" onclick="toggleFavorite(this, event)">
@@ -1374,9 +1407,6 @@ data-category="<?= $category ?>">
         <?php endforeach; ?>
     </div>
 
-    <div style="text-align: center; margin-top: 50px;">
-        <button class="my-basket-btn">More</button>
-    </div>
 </section>
 
 <!-- ✅ VIDEO TESTIMONIALS SECTION -->
@@ -2339,21 +2369,20 @@ document.getElementById('trackingInput')?.addEventListener('keypress', function(
         <span style="font-size: 0.75rem; margin-top: 2px;">Chat</span>
     </button>
 
-    <!-- ✅ FIX: Tombol Keranjang → submit form, buy_now=0 -->
-    <button type="submit" form="modalFormPesan"
-        onclick="document.getElementById('modal-buy-now').value='0'"
-        class="beli-sekarang-btn" 
-        style="background: #f0f0f0; border: none; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; margin: 0 4px; cursor: pointer; flex-shrink: 0;">
-        <i class="fas fa-shopping-cart" style="color: var(--primary); font-size: 1.3rem;"></i>
-    </button>
+  <!-- Tombol Keranjang → buka modal pilih topping/level/suhu -->
+<button type="button"
+    onclick="dmOpenOrder('cart')"
+    style="background: #f0f0f0; border: none; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; margin: 0 4px; cursor: pointer; flex-shrink: 0;">
+    <i class="fas fa-shopping-cart" style="color: var(--primary); font-size: 1.3rem;"></i>
+</button>
 
-    <!-- ✅ FIX: Tombol Beli Sekarang → submit form, buy_now=1 -->
-    <button type="submit" form="modalFormPesan"
-        onclick="document.getElementById('modal-buy-now').value='1'"
-        style="background: var(--primary); color: white; border: none; border-radius: 24px; padding: 10px 24px; font-weight: 600; cursor: pointer; flex: 1;">
-        <div style="font-size: 0.95rem;">Beli sekarang</div>
-        <div style="font-size: 0.8rem; opacity: 0.85;"><span id="md-price-bottom">Rp 0</span> | Pengiriman gratis</div>
-    </button>
+<!-- Tombol Beli Sekarang → buka modal pilih topping/level/suhu -->
+<button type="button"
+    onclick="dmOpenOrder('buy')"
+    style="background: var(--primary); color: white; border: none; border-radius: 24px; padding: 10px 24px; font-weight: 600; cursor: pointer; flex: 1;">
+    <div style="font-size: 0.95rem;">Beli sekarang</div>
+    <div style="font-size: 0.8rem; opacity: 0.85;"><span id="md-price-bottom">Rp 0</span> | Pengiriman gratis</div>
+</button>
 
 </div>
         </div>
@@ -2464,29 +2493,54 @@ function toggleFavorite(btn, event) {
     }
 }
 
-// Modal Detail
+// Modal Detail - PERBAIKAN HARGA
 var modal = document.getElementById('modalDetail');
 modal.addEventListener('show.bs.modal', function (event) {
     var button = event.relatedTarget;
     var imgSrc = button.getAttribute('data-img');
     
-    // Set image dengan fallback
-    document.getElementById('md-img').src = imgSrc || 'assets/images/placeholder.png';
-    document.getElementById('md-name').innerText = button.getAttribute('data-name');
-    document.getElementById('md-price').innerText = "Rp " + parseInt(button.getAttribute('data-price')).toLocaleString('id-ID');
+    // 1. Ambil Data
+    dmState.id       = button.getAttribute('data-id');
+    dmState.name     = button.getAttribute('data-name');
+    dmState.price    = parseInt(button.getAttribute('data-price')) || 0; // Pastikan angka
+    dmState.image    = imgSrc || 'assets/images/placeholder.png';
+    dmState.category = button.getAttribute('data-category') || '';
+    dmState.toppings = JSON.parse(button.getAttribute('data-toppings') || '[]');
+    dmState.levels   = JSON.parse(button.getAttribute('data-levels') || '[]');
+
+    // 2. Format Harga
+    var formattedPrice = "Rp " + dmState.price.toLocaleString('id-ID');
+
+    // 3. Update UI Gambar & Teks Dasar
+    document.getElementById('md-img').src = dmState.image;
+    document.getElementById('md-name').innerText = dmState.name;
     document.getElementById('md-desc').innerText = button.getAttribute('data-desc') || '';
 
-    // ✅ FIX: isi harga di tombol Beli Sekarang
-    document.getElementById('md-price-bottom').innerText = "Rp " + parseInt(button.getAttribute('data-price')).toLocaleString('id-ID');
+    // 4. ✅ PENTING: Isi Harga di SEMUA Tempat agar tidak Rp 0
+    // A. Di tengah modal (detail produk)
+    var mdPriceEl = document.getElementById('md-price');
+    if(mdPriceEl) mdPriceEl.innerText = formattedPrice;
 
-    // ✅ FIX: isi semua hidden input form supaya Keranjang & Beli Sekarang berfungsi
-    document.getElementById('modal-product-id').value    = button.getAttribute('data-id');
-    document.getElementById('modal-product-name').value  = button.getAttribute('data-name');
-    document.getElementById('modal-product-price').value = button.getAttribute('data-price');
-    document.getElementById('modal-buy-now').value       = '0'; // reset tiap buka modal
+    // B. Di tombol "Beli Sekarang" bagian bawah (INI YANG ANDA MAU)
+    var mdPriceBottomEl = document.getElementById('md-price-bottom');
+    if(mdPriceBottomEl) mdPriceBottomEl.innerText = formattedPrice;
 
-    // ✅ FIX: simpan nama produk untuk fungsi chat WhatsApp modal
-    document.getElementById('modalFormPesan').dataset.productName = button.getAttribute('data-name');
+    // C. Di banner Flash Sale ("Mulai Rp ...")
+    var mdPriceFlashEl = document.getElementById('md-price-flash');
+    if(mdPriceFlashEl) mdPriceFlashEl.innerText = formattedPrice;
+
+    // D. Simulasi PayLater (opsional)
+    var mdPaylaterEl = document.getElementById('md-paylater');
+    if(mdPaylaterEl) mdPaylaterEl.innerText = Math.floor(dmState.price / 3).toLocaleString('id-ID');
+
+    // 5. Isi Hidden Input Form
+    document.getElementById('modal-product-id').value    = dmState.id;
+    document.getElementById('modal-product-name').value  = dmState.name;
+    document.getElementById('modal-product-price').value = dmState.price;
+    document.getElementById('modal-buy-now').value       = '0'; 
+    
+    // Simpan nama untuk chat WhatsApp
+    document.getElementById('modalFormPesan').dataset.productName = dmState.name;
 });
 
 // Variant Modal
@@ -2749,13 +2803,19 @@ function buyNow() {
 }
 
 // Fungsi Tampilkan Profil Toko (Update)
+// Simpan display asli setiap elemen sebelum disembunyikan
+const _originalDisplayMap = new Map();
+
 function showStoreProfile() {
     const modalBody = document.querySelector('#modalDetail .modal-body');
     const children = modalBody.children;
     
-    // Sembunyikan semua kecuali storeProfileContent
+    // Simpan display asli & sembunyikan semua kecuali storeProfileContent
     for(let i = 0; i < children.length; i++){
         if(children[i].id !== 'storeProfileContent'){
+            // Simpan computed display asli (bukan inline style, tapi yang aktual)
+            const computedDisplay = window.getComputedStyle(children[i]).display;
+            _originalDisplayMap.set(children[i], computedDisplay);
             children[i].style.display = 'none';
         }
     }
@@ -2773,10 +2833,12 @@ function backToProduct() {
     const modalBody = document.querySelector('#modalDetail .modal-body');
     const children = modalBody.children;
     
-    // Tampilkan kembali semua konten produk
+    // Kembalikan display asli masing-masing elemen
     for(let i = 0; i < children.length; i++){
         if(children[i].id !== 'storeProfileContent'){
-            children[i].style.display = 'block';
+            const originalDisplay = _originalDisplayMap.get(children[i]);
+            // Gunakan display asli jika tersimpan, fallback ke '' agar CSS inline dihapus
+            children[i].style.display = originalDisplay || '';
         }
     }
     
@@ -3301,11 +3363,12 @@ function checkoutNow(){
 // ============================================================
 var dmState = {
   id: null, name: '', price: 0, image: '', category: '',
-  action: 'cart'
+  action: 'cart', toppings: [], levels: []
 };
 var omState = {
   id: null, name: '', basePrice: 0, category: '',
   qty: 1, suhu: null, level: null, levelName: '',
+  levelExtra: 0,
   toppings: {}, action: 'cart'
 };
 
@@ -3341,7 +3404,10 @@ document.getElementById('detailModal').addEventListener('click', function(e) {
 
 // Tombol Keranjang / Beli Sekarang dari modal detail
 function dmOpenOrder(action) {
-  closeDetailModal();
+  // Tutup #modalDetail (Bootstrap modal) dengan benar
+  var bsModal = bootstrap.Modal.getInstance(document.getElementById('modalDetail'));
+  if (bsModal) bsModal.hide();
+
   omState.action    = action;
   omState.id        = dmState.id;
   omState.name      = dmState.name;
@@ -3354,8 +3420,8 @@ function dmOpenOrder(action) {
   omState.toppings  = {};
 
   // Set header modal order
-  document.getElementById('omImg').src             = dmState.image || 'assets/images/placeholder.jpg';
-  document.getElementById('omName').textContent     = dmState.name;
+  document.getElementById('omImg').src              = dmState.image || 'assets/images/placeholder.jpg';
+  document.getElementById('omName').textContent      = dmState.name;
   document.getElementById('omBaseLabel').textContent = 'Harga dasar: ' + dmFmt(dmState.price);
   document.getElementById('omBasePrice').textContent = dmFmt(dmState.price);
   document.getElementById('omQty').textContent       = 1;
@@ -3364,61 +3430,54 @@ function dmOpenOrder(action) {
   document.getElementById('omLevelWarn').style.display = 'none';
   document.getElementById('omSuhuWarn').style.display  = 'none';
 
-  // Tombol label
   document.getElementById('omSubmitLabel').textContent =
     action === 'buy' ? '⚡ Beli Sekarang' : '🛒 Tambah ke Keranjang';
 
-  // Tentukan section yang tampil berdasarkan kategori
-  var cat = (dmState.category || '').toLowerCase();
-  var isMie     = cat === 'mie';
+  // --- SUHU: hanya minuman ---
+  var cat       = (dmState.category || '').toLowerCase();
   var isMinuman = cat === 'minuman';
-  var isMercon  = cat === 'mercon';
-  var isDimsum  = cat === 'dimsum';
-
-  // Suhu: hanya minuman
-  document.getElementById('omSuhuSection').style.display  = isMinuman ? 'block' : 'none';
-  // Level: mie & mercon
-  document.getElementById('omLevelSection').style.display = (isMie || isMercon) ? 'block' : 'none';
-  // Topping: mie, mercon, dimsum
-  var showTopping = isMie || isMercon || isDimsum;
-  document.getElementById('omToppingSection').style.display = showTopping ? 'block' : 'none';
-
-  // Reset pilihan suhu visual
+  document.getElementById('omSuhuSection').style.display = isMinuman ? 'block' : 'none';
   document.querySelectorAll('#omSuhuSection [onclick]').forEach(function(el) {
     el.style.borderColor = '#e8e8e8';
     el.style.background  = '#fff';
     el.querySelector('div:last-child').style.color = '#1a1a1a';
   });
 
-  // Reset pilihan level visual
-  document.querySelectorAll('#omLevelList [onclick]').forEach(function(el) {
-    el.style.borderColor = '#e8e8e8';
-    el.style.background  = '#fff';
-    el.querySelector('div:last-child').style.color = '#1a1a1a';
-  });
+  // --- LEVEL: dari database per produk ---
+  var levels = dmState.levels || [];
+  document.getElementById('omLevelSection').style.display = levels.length > 0 ? 'block' : 'none';
+  if (levels.length > 0) {
+    var lvIcons = ['🌶️','🌶️🌶️','🌶️🌶️🌶️','🔥🔥','💀'];
+    var lvHtml  = '';
+    levels.forEach(function(lv, i) {
+      var extraLabel = lv.price > 0
+        ? '<div style="font-size:10px;color:#c17d2a;margin-top:1px;">+' + dmFmt(lv.price) + '</div>'
+        : '';
+      lvHtml += '<div onclick="omPickLevel(' + lv.id + ',\'' + lv.name.replace(/'/g,"\\'") + '\',' + (lv.price||0) + ',this)"'
+              + ' style="padding:8px 14px;border-radius:10px;border:1.5px solid #e8e8e8;cursor:pointer;text-align:center;min-width:80px;">'
+              + '<div style="font-size:16px;">' + (lvIcons[i] || '🌶️') + '</div>'
+              + '<div style="font-size:12px;font-weight:600;margin-top:2px;color:#1a1a1a;">' + lv.name + '</div>'
+              + extraLabel
+              + '</div>';
+    });
+    document.getElementById('omLevelList').innerHTML = lvHtml;
+  }
 
-  // Load topping dari API jika kategori punya topping
-  if (showTopping) {
-    document.getElementById('omToppingList').innerHTML =
-      '<div style="text-align:center;padding:20px;color:#aaa;font-size:13px;">Memuat topping...</div>';
-
-    fetch('api_topping.php?action=get&product_id=' + dmState.id)
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        if (data.toppings && data.toppings.length > 0) {
-          omRenderToppings(data.toppings);
-        } else {
-          document.getElementById('omToppingList').innerHTML =
-            '<div style="font-size:13px;color:#aaa;text-align:center;padding:10px;">Tidak ada topping tersedia</div>';
-        }
-      })
-      .catch(function() {
-        document.getElementById('omToppingList').innerHTML = '';
-      });
+  // --- TOPPING: dari database per produk ---
+  var toppings = dmState.toppings || [];
+  document.getElementById('omToppingSection').style.display = toppings.length > 0 ? 'block' : 'none';
+  if (toppings.length > 0) {
+    omRenderToppings(toppings);
+  } else {
+    document.getElementById('omToppingList').innerHTML = '';
   }
 
   omUpdatePrice();
-  document.getElementById('orderModal').style.display = 'flex';
+
+  // Buka orderModal setelah Bootstrap modal selesai tutup
+  setTimeout(function() {
+    document.getElementById('orderModal').style.display = 'flex';
+  }, 300);
 }
 
 function closeOrderModal() {
@@ -3470,9 +3529,10 @@ function omPickSuhu(suhu, el) {
   omUpdatePrice();
 }
 
-function omPickLevel(id, name, el) {
-  omState.level     = id;
-  omState.levelName = name;
+function omPickLevel(id, name, price, el) {
+  omState.level      = id;
+  omState.levelName  = name;
+  omState.levelPrice = parseInt(price) || 0;
   document.getElementById('omLevelWarn').style.display = 'none';
   document.querySelectorAll('#omLevelList [onclick]').forEach(function(e) {
     e.style.borderColor = '#e8e8e8';
@@ -3501,8 +3561,9 @@ function omChangeQty(d) {
 // UPDATE HARGA
 // ============================================================
 function omUpdatePrice() {
-  var base     = omState.basePrice;
-  var topSum   = 0;
+  var base      = omState.basePrice;
+  var topSum    = 0;
+  var levelSum  = omState.levelPrice || 0;
   var breakdown = '';
 
   for (var id in omState.toppings) {
@@ -3523,12 +3584,13 @@ function omUpdatePrice() {
   }
 
   if (omState.level) {
+    var lvLabel = levelSum > 0 ? '+' + dmFmt(levelSum) : 'Gratis';
     breakdown += '<div style="display:flex;justify-content:space-between;margin-top:4px;">'
                + '<span style="font-size:12px;color:#888;">Level: ' + omState.levelName + '</span>'
-               + '<span style="font-size:12px;color:#888;">Gratis</span></div>';
+               + '<span style="font-size:12px;color:' + (levelSum > 0 ? '#8B5A2B' : '#888') + ';">' + lvLabel + '</span></div>';
   }
 
-  var perPortion = base + topSum;
+  var perPortion = base + topSum + levelSum;
   var total      = perPortion * omState.qty;
 
   document.getElementById('omBreakdown').innerHTML    = breakdown;
@@ -3537,80 +3599,77 @@ function omUpdatePrice() {
 }
 
 // ============================================================
-// SUBMIT ORDER
+// SUBMIT ORDER (PERBAIKAN: GUNAKAN FORM SUBMIT KE INDEX.PHP)
+// Letakkan ini di dalam <script> paling bawah index.php
+// Ganti fungsi omSubmit() yang lama dengan ini
 // ============================================================
 function omSubmit() {
-  var cat       = (omState.category || '').toLowerCase();
-  var isMie     = cat === 'mie';
-  var isMinuman = cat === 'minuman';
-  var isMercon  = cat === 'mercon';
+    var cat       = (omState.category || '').toLowerCase();
+    var isMinuman = cat === 'minuman';
+    
+    // Validasi suhu
+    if (isMinuman && !omState.suhu) {
+        document.getElementById('omSuhuWarn').style.display = 'block';
+        return;
+    }
+    
+    // Validasi level — wajib jika section level tampil
+    var lvlSection = document.getElementById('omLevelSection');
+    if (lvlSection.style.display !== 'none' && !omState.level) {
+        document.getElementById('omLevelWarn').style.display = 'block';
+        return;
+    }
 
-  // Validasi suhu
-  if (isMinuman && !omState.suhu) {
-    document.getElementById('omSuhuWarn').style.display = 'block';
-    return;
-  }
+    // Kumpulkan topping ids
+    var toppingIds = [];
+    for (var id in omState.toppings) {
+        if (omState.toppings[id]) toppingIds.push(id);
+    }
 
-  // Validasi level
-  if ((isMie || isMercon) && !omState.level) {
-    document.getElementById('omLevelWarn').style.display = 'block';
-    return;
-  }
+    // Hitung total harga per item
+    var topSum = 0;
+    for (var id2 in omState.toppings) {
+        if (omState.toppings[id2]) topSum += parseInt(omState.toppings[id2].price);
+    }
+    
+    // Harga final per porsi (Harga Dasar + Topping + Level)
+    var pricePerItem = omState.basePrice + topSum + (omState.levelPrice || 0);
+    
+    // Siapkan Nama Varian untuk ditampilkan di Checkout
+    var variantName = omState.levelName || omState.suhu || 'Regular';
+    var itemName = omState.name + ' (' + variantName + ')';
+    
+    // ✅ FIX: Isi Hidden Input Form yang sudah ada di HTML index.php
+    // Form ID: modalFormPesan
+    document.getElementById('modal-product-id').value = omState.id;
+    document.getElementById('modal-product-name').value = itemName; 
+    document.getElementById('modal-product-price').value = pricePerItem; 
+    document.getElementById('modal-product-variant').value = variantName;
+    
+    // Set Action Form ke index.php (karena logika add_to_cart ada di index.php)
+    var form = document.getElementById('modalFormPesan');
+    form.action = 'index.php';
+    form.method = 'POST';
+    
+    // Jika "Beli Sekarang", tambahkan input buy_now=1 agar redirect ke checkout
+    if (omState.action === 'buy') {
+        // Hapus input buy_now lama jika ada
+        var existingBuy = form.querySelector('input[name="buy_now"]');
+        if(existingBuy) existingBuy.remove();
 
-  // Kumpulkan topping ids
-  var toppingIds = [];
-  for (var id in omState.toppings) {
-    if (omState.toppings[id]) toppingIds.push(id);
-  }
+        var buyInput = document.createElement('input');
+        buyInput.type = 'hidden';
+        buyInput.name = 'buy_now';
+        buyInput.value = '1';
+        form.appendChild(buyInput);
+    } else {
+        // Jika hanya tambah keranjang, pastikan buy_now tidak ada atau 0
+        var existingBuy = form.querySelector('input[name="buy_now"]');
+        if(existingBuy) existingBuy.value = '0';
+    }
 
-  // Hitung total
-  var topSum = 0;
-  for (var id2 in omState.toppings) {
-    if (omState.toppings[id2]) topSum += parseInt(omState.toppings[id2].price);
-  }
-  var total = (omState.basePrice + topSum) * omState.qty;
-
-  var fd = new FormData();
-  fd.append('action',      'add_cart');
-  fd.append('product_id',  omState.id);
-  fd.append('qty',         omState.qty);
-  fd.append('level_id',    omState.level || '');
-  fd.append('suhu',        omState.suhu  || '');
-  fd.append('note',        document.getElementById('omNote').value);
-  fd.append('topping_ids', JSON.stringify(toppingIds));
-
-  document.getElementById('omSubmitBtn').disabled = true;
-
-  fetch('api_topping.php', { method: 'POST', body: fd })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      if (data.success) {
-        closeOrderModal();
-        if (omState.action === 'buy') {
-          window.location.href = 'checkout.php';
-        } else {
-          // Update badge keranjang
-          var badge = document.querySelector('.cart-count');
-          if (badge) {
-            var cur = parseInt(badge.textContent) || 0;
-            badge.textContent = cur + omState.qty;
-            badge.style.display = 'flex';
-          }
-          // Notifikasi
-          var n = document.createElement('div');
-          n.textContent = '✅ ' + omState.name + ' ditambahkan ke keranjang!';
-          n.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:10px 20px;border-radius:99px;font-size:13px;z-index:99999;white-space:nowrap;';
-          document.body.appendChild(n);
-          setTimeout(function() { n.remove(); }, 2500);
-        }
-      } else {
-        alert(data.error || 'Terjadi kesalahan');
-      }
-    })
-    .catch(function() { alert('Gagal menghubungi server'); })
-    .finally(function() {
-      document.getElementById('omSubmitBtn').disabled = false;
-    });
+    // Submit Form secara normal (bukan fetch/ajax)
+    form.submit();
 }
 </script>
 
@@ -3727,7 +3786,9 @@ function omSubmit() {
             ['id'=>5,'nama'=>'Level 5','icon'=>'💀'],
           ];
           foreach($levels_fix as $lv): ?>
-          <div onclick="omPickLevel(<?= $lv['id'] ?>, '<?= $lv['nama'] ?>', this)" 
+          <div onclick="omPickLevel(<?= $lv['id'] ?>, '<?= $lv['nama'] ?>', this)"
+            data-extra="<?= $lv['extra_price'] ?? 0 ?>"   
+          
                style="padding:8px 14px; border-radius:10px; border:1.5px solid #e8e8e8; cursor:pointer; text-align:center; min-width:80px;">
             <div style="font-size:16px;"><?= $lv['icon'] ?></div>
             <div style="font-size:12px; font-weight:600; margin-top:2px; color:#1a1a1a;"><?= $lv['nama'] ?></div>
@@ -3782,6 +3843,5 @@ function omSubmit() {
 }
 </style>
 
-<?php include 'modal_detail_lengkap.php'; ?>
 </body>
 </html>
