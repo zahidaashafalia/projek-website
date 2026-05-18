@@ -112,30 +112,6 @@ while($row = mysqli_fetch_assoc($result)){
         'variants' => []
     ];
 }
-// 🔥 AMBIL ULASAN UNTUK SETIAP PRODUK
-foreach($products as $k => $p){
-    $pid = (int)$p['id'];
-    
-    // Query untuk mengambil ulasan berdasarkan product_id
-    // Kita ambil maksimal 3 ulasan terbaru per produk
-    $review_query = mysqli_query($conn, "
-        SELECT rating, review_text, review_image, created_at 
-        FROM reviews 
-        WHERE product_id = $pid 
-        ORDER BY created_at DESC 
-        LIMIT 3
-    ");
-    
-    $reviews = [];
-    if ($review_query) {
-        while($rev = mysqli_fetch_assoc($review_query)) {
-            $reviews[] = $rev;
-        }
-    }
-    
-    // Simpan array ulasan ke dalam array produk
-    $products[$k]['reviews'] = $reviews;
-}
 // 🔥 Ambil toppings & levels untuk setiap produk
 foreach($products as $k => $p){
     $pid = (int)$p['id'];

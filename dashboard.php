@@ -277,7 +277,12 @@ $recentOrders = mysqli_query($conn, "SELECT * FROM orders ORDER BY created_at DE
     <li><a href="admin_topping.php" class="<?= ($currentPage ?? '') == 'admin_topping.php' ? 'active' : '' ?>">
     <i class="fas fa-pepper-hot"></i><span>Topping & Level</span>
 </a></li>
-
+<li>
+    <a href="admin_store_profile.php" class="<?= ($currentPage == 'admin_store_profile.php') ? 'active' : '' ?>">
+        <i class="fas fa-store"></i>
+        <span>Profil Toko</span>
+    </a>
+</li>
     <li><a href="settings.php"><i class="fas fa-cog"></i><span>Pengaturan</span></a></li>
 </ul>
 </aside>
