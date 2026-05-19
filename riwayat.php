@@ -1,26 +1,58 @@
 <?php
+session_start(); // Pastikan session dimulai
 include 'config.php';
+
+// Cek login
+if(!isset($_SESSION['user_phone'])){
+    header("Location: auth/login.php");
+    exit;
+}
+
+$phone = $_SESSION['user_phone'];
+
+// ==========================================
+// LOGIKA PEMBATALAN PESANAN (BARU)
+// ==========================================
+if(isset($_GET['cancel_order'])){
+    $order_id_to_cancel = (int)$_GET['cancel_order'];
+    
+    // Cek apakah pesanan milik user yang sedang login dan masih bisa dibatalkan
+    $check_query = mysqli_query($conn, "SELECT id, status FROM orders WHERE id = $order_id_to_cancel AND customer_phone = '$phone' LIMIT 1");
+    
+    if(mysqli_num_rows($check_query) > 0){
+        $order_data = mysqli_fetch_assoc($check_query);
+        
+        // Hanya bisa batalkan jika statusnya masih 'Menunggu Konfirmasi' atau 'Pending'
+        if(in_array($order_data['status'], ['Menunggu Konfirmasi', 'Pending'])){
+            mysqli_query($conn, "UPDATE orders SET status = 'Dibatalkan' WHERE id = $order_id_to_cancel");
+            echo "<script>alert('Pesanan berhasil dibatalkan.'); window.location.href='riwayat.php';</script>";
+            exit;
+        } else {
+            echo "<script>alert('Pesanan dengan status \"" . $order_data['status'] . "\" tidak dapat dibatalkan.'); window.location.href='riwayat.php';</script>";
+            exit;
+        }
+    } else {
+        echo "<script>alert('Pesanan tidak ditemukan atau bukan milik Anda.'); window.location.href='riwayat.php';</script>";
+        exit;
+    }
+}
 
 // Ambil data pesanan dari database
 $orders = [];
-if(isset($_SESSION['user_phone'])){
-    $phone = $_SESSION['user_phone'];
-    // Pastikan kolom payment_method ada di tabel orders
-    $result = mysqli_query($conn, "SELECT * FROM orders WHERE customer_phone = '$phone' ORDER BY id DESC");
-    while($row = mysqli_fetch_assoc($result)){
-        $items = [];
-        
-        // Coba ambil dari tabel order_items (Lebih stabil daripada JSON)
-        $itemsResult = mysqli_query($conn, "SELECT * FROM order_items WHERE order_id = {$row['id']}");
-        if($itemsResult){
-            while($item = mysqli_fetch_assoc($itemsResult)){
-                $items[] = $item;
-            }
+$result = mysqli_query($conn, "SELECT * FROM orders WHERE customer_phone = '$phone' ORDER BY id DESC");
+while($row = mysqli_fetch_assoc($result)){
+    $items = [];
+    
+    // Ambil item dari tabel order_items
+    $itemsResult = mysqli_query($conn, "SELECT * FROM order_items WHERE order_id = {$row['id']}");
+    if($itemsResult){
+        while($item = mysqli_fetch_assoc($itemsResult)){
+            $items[] = $item;
         }
-        
-        $row['items'] = $items;
-        $orders[] = $row;
     }
+    
+    $row['items'] = $items;
+    $orders[] = $row;
 }
 
 $currentPage = 'riwayat.php';
@@ -40,27 +72,14 @@ $filteredOrders = array_filter($orders, function($o) use ($activeFilter) {
 // Status config
 function getStatusConfig($status) {
     return match($status){
-        'Selesai'               => ['label' => 'Pesanan selesai',         'color' => '#4CAF50', 'icon' => 'fa-check-circle',   'badge' => '#4CAF50'],
-        'Dikirim'               => ['label' => 'Sedang dikirim',          'color' => '#2196F3', 'icon' => 'fa-shipping-fast',  'badge' => '#2196F3'],
-        'Menunggu Konfirmasi'   => ['label' => 'Menunggu konfirmasi',     'color' => '#FF9800', 'icon' => 'fa-clock',          'badge' => '#FF9800'],
-        'Diproses'              => ['label' => 'Pesanan diproses',        'color' => '#9C27B0', 'icon' => 'fa-cog',            'badge' => '#9C27B0'],
-        'Dibatalkan'            => ['label' => 'Pesanan dibatalkan',      'color' => '#F44336', 'icon' => 'fa-times-circle',   'badge' => '#F44336'],
-        'Menunggu Pembayaran'   => ['label' => 'Perlu dibayar',           'color' => '#FF5722', 'icon' => 'fa-money-bill',     'badge' => '#FF5722'],
+        'Selesai'               => ['label' => 'Pesanan Selesai',         'color' => '#4CAF50', 'icon' => 'fa-check-circle',   'badge' => '#4CAF50'],
+        'Dikirim'               => ['label' => 'Sedang Dikirim',          'color' => '#2196F3', 'icon' => 'fa-shipping-fast',  'badge' => '#2196F3'],
+        'Menunggu Konfirmasi'   => ['label' => 'Menunggu Konfirmasi',     'color' => '#FF9800', 'icon' => 'fa-clock',          'badge' => '#FF9800'],
+        'Diproses'              => ['label' => 'Pesanan Diproses',        'color' => '#9C27B0', 'icon' => 'fa-cog',            'badge' => '#9C27B0'],
+        'Dibatalkan'            => ['label' => 'Pesanan Dibatalkan',      'color' => '#F44336', 'icon' => 'fa-times-circle',   'badge' => '#F44336'],
+        'Menunggu Pembayaran'   => ['label' => 'Perlu Dibayar',           'color' => '#FF5722', 'icon' => 'fa-money-bill',     'badge' => '#FF5722'],
         'Pending'               => ['label' => 'Pending',                 'color' => '#FF9800', 'icon' => 'fa-clock',          'badge' => '#FF9800'],
         default                 => ['label' => $status ?? 'Unknown',      'color' => '#9E9E9E', 'icon' => 'fa-question-circle','badge' => '#9E9E9E'],
-    };
-}
-
-function getStatusMessage($status, $resi) {
-    return match($status){
-        'Selesai'             => 'Paket Anda telah diterima.',
-        'Dikirim'             => 'Paket sedang dalam perjalanan.' . ($resi ? ' No. Resi: ' . $resi : ''),
-        'Menunggu Konfirmasi' => 'Pesanan Anda menunggu konfirmasi.',
-        'Diproses'            => 'Pesanan Anda sedang diproses.',
-        'Dibatalkan'          => 'Pengantaran paket Anda dibatalkan.',
-        'Menunggu Pembayaran' => 'Silakan lakukan pembayaran.',
-        'Pending'             => 'Pesanan sedang diproses.',
-        default               => 'Status pesanan tidak diketahui.',
     };
 }
 
@@ -100,6 +119,8 @@ if(isset($_SESSION['user_phone']) && isset($conn)){
     --text-dark: #3D2914;
     --text-gray: #8B7355;
     --border: #E8DDD4;
+    --green: #26aa99;
+    --red: #dc3545;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -193,6 +214,12 @@ body { background: #f5f5f5; color: var(--text-dark); font-family: 'Segoe UI', sy
     border: 1px solid var(--border);
     border-radius: 8px;
     overflow: hidden;
+    cursor: pointer; /* Indikasi bisa diklik */
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.order-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 .order-header {
     padding: 14px 18px;
@@ -331,6 +358,107 @@ body { background: #f5f5f5; color: var(--text-dark); font-family: 'Segoe UI', sy
     margin-bottom: 16px;
     color: var(--primary);
 }
+
+/* Modal Detail Style */
+.modal-detail-header {
+    background: #f8f9fa;
+    padding: 20px;
+    border-bottom: 1px solid #eee;
+    text-align: center;
+}
+.modal-status-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 5px;
+}
+.modal-status-desc {
+    color: #666;
+    font-size: 0.95rem;
+}
+.modal-section {
+    padding: 15px 20px;
+    border-bottom: 1px solid #eee;
+}
+.modal-section h6 {
+    font-weight: 700;
+    margin-bottom: 10px;
+    color: var(--text-dark);
+}
+.modal-address {
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+.modal-product-item {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+.modal-product-img {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid #eee;
+}
+.modal-product-info {
+    flex: 1;
+}
+.modal-product-name {
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+.modal-product-variant {
+    font-size: 0.85rem;
+    color: #666;
+    margin-bottom: 5px;
+}
+.modal-product-price {
+    font-weight: 700;
+    color: var(--primary);
+}
+.modal-summary-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+}
+.modal-summary-total {
+    font-weight: 800;
+    font-size: 1.1rem;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed #ddd;
+}
+.modal-info-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+}
+.modal-info-label {
+    color: #666;
+}
+.modal-info-value {
+    font-weight: 600;
+    text-align: right;
+}
+.btn-cancel-order {
+    background: #fff;
+    color: var(--red);
+    border: 1px solid var(--red);
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    width: 100%;
+    margin-top: 10px;
+    text-decoration: none;
+    display: inline-block;
+    text-align: center;
+}
+.btn-cancel-order:hover {
+    background: var(--red);
+    color: white;
+}
 </style>
 </head>
 <body>
@@ -389,8 +517,6 @@ body { background: #f5f5f5; color: var(--text-dark); font-family: 'Segoe UI', sy
 <!-- Main Content -->
 <div class="main-content">
 
-    <!-- ✅ BONUS BANNER DIHAPUS SESUAI PERMINTAAN -->
-
     <?php if(empty($filteredOrders)): ?>
     <div class="empty-state">
         <i class="fas fa-receipt"></i>
@@ -403,7 +529,6 @@ body { background: #f5f5f5; color: var(--text-dark); font-family: 'Segoe UI', sy
     <?php foreach($filteredOrders as $order):
         $cfg = getStatusConfig($order['status'] ?? '');
         $timeStr = formatTime($order['created_at'] ?? '');
-        $trackMsg = getStatusMessage($order['status'] ?? '', $order['resi_number'] ?? '');
         $storeName = $order['store_name'] ?? $order['store'] ?? 'Texcer Hot';
         $items = $order['items'] ?? [];
         $status = $order['status'] ?? '';
@@ -431,7 +556,8 @@ body { background: #f5f5f5; color: var(--text-dark); font-family: 'Segoe UI', sy
             }
         }
     ?>
-    <div class="order-card">
+    <!-- Order Card with Click Event -->
+    <div class="order-card" onclick="showOrderDetail(<?= htmlspecialchars(json_encode($order), ENT_QUOTES) ?>)">
 
         <!-- Header -->
         <div class="order-header">
@@ -453,33 +579,34 @@ body { background: #f5f5f5; color: var(--text-dark); font-family: 'Segoe UI', sy
                 <div class="tracking-time">
                     <?= $timeStr ?> <?= $isSelesai ? 'Diterima' : ($status === 'Dibatalkan' ? 'Dibatalkan' : 'Menunggu konfirmasi') ?>
                 </div>
-                <div class="tracking-desc"><?= htmlspecialchars($trackMsg) ?></div>
+                <div class="tracking-desc"><?= htmlspecialchars($cfg['label']) ?></div>
             </div>
             <i class="fas fa-chevron-right" style="color:#ccc;"></i>
         </div>
 
-        <!-- Products -->
+        <!-- Products Preview (First Item Only) -->
         <?php if(is_array($items) && !empty($items)): ?>
-            <?php foreach($items as $item): 
-                $itemName = $item['name'] ?? ($item['product_name'] ?? 'Produk');
-                $itemVariant = $item['variant'] ?? '';
-                $itemPrice = $item['price'] ?? 0;
-                $itemQty = $item['qty'] ?? ($item['quantity'] ?? 1);
-                $itemImage = $item['image'] ?? ($item['product_image'] ?? '');
-                
-                // ✅ PERBAIKAN PATH GAMBAR AGAR MUNCUL
-                $imagePath = '';
-                if(!empty($itemImage)){
-                    if(filter_var($itemImage, FILTER_VALIDATE_URL)){
-                        $imagePath = $itemImage;
-                    } elseif(file_exists($itemImage)){
-                        $imagePath = $itemImage;
-                    } elseif(file_exists('uploads/' . $itemImage)){
-                        $imagePath = 'uploads/' . $itemImage;
-                    } elseif(file_exists('texcer2/uploads/' . $itemImage)){
-                        $imagePath = 'texcer2/uploads/' . $itemImage;
-                    } 
-                }
+            <?php 
+            $firstItem = $items[0];
+            $itemName = $firstItem['name'] ?? ($firstItem['product_name'] ?? 'Produk');
+            $itemVariant = $firstItem['variant'] ?? '';
+            $itemPrice = $firstItem['price'] ?? 0;
+            $itemQty = $firstItem['qty'] ?? ($firstItem['quantity'] ?? 1);
+            $itemImage = $firstItem['image'] ?? ($firstItem['product_image'] ?? '');
+            
+            // PERBAIKAN PATH GAMBAR
+            $imagePath = '';
+            if(!empty($itemImage)){
+                if(filter_var($itemImage, FILTER_VALIDATE_URL)){
+                    $imagePath = $itemImage;
+                } elseif(file_exists($itemImage)){
+                    $imagePath = $itemImage;
+                } elseif(file_exists('uploads/' . $itemImage)){
+                    $imagePath = 'uploads/' . $itemImage;
+                } elseif(file_exists('texcer2/uploads/' . $itemImage)){
+                    $imagePath = 'texcer2/uploads/' . $itemImage;
+                } 
+            }
             ?>
             <div class="product-row">
                 <?php if(!empty($imagePath)): ?>
@@ -501,7 +628,11 @@ body { background: #f5f5f5; color: var(--text-dark); font-family: 'Segoe UI', sy
                     </div>
                 </div>
             </div>
-            <?php endforeach; ?>
+            <?php if(count($items) > 1): ?>
+            <div style="padding: 5px 18px; font-size: 0.85rem; color: #666;">
+                + <?= count($items) - 1 ?> item lainnya...
+            </div>
+            <?php endif; ?>
         <?php else: ?>
         <div style="padding:20px; text-align:center; color:var(--text-gray);">
             <p>Detail produk tidak tersedia</p>
@@ -516,10 +647,8 @@ body { background: #f5f5f5; color: var(--text-dark); font-family: 'Segoe UI', sy
                 <span style="font-size:0.8rem; color:#666; font-weight:normal; margin-left:8px;">(COD)</span>
                 <?php endif; ?>
             </div>
-            <div class="action-buttons">
+            <div class="action-buttons" onclick="event.stopPropagation()"> <!-- Prevent card click when clicking button -->
     
-                <!-- ✅ TOMBOL REVIEW & KERANJANG DIHAPUS SESUAI PERMINTAAN -->
-                
                 <!-- ✅ LOGIKA TOMBOL UTAMA (COD vs NON-COD) -->
                 <?php if($showPayButton): ?>
                 <button class="btn-buy-again" onclick="<?= $btnAction ?>">
@@ -544,8 +673,176 @@ body { background: #f5f5f5; color: var(--text-dark); font-family: 'Segoe UI', sy
 
 </div>
 
+<!-- ✅ MODAL DETAIL PESANAN -->
+<div class="modal fade" id="orderDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content" style="border-radius: 12px; border: none;">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold">Detail Pesanan</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body pt-0" id="modalBodyContent">
+                <!-- Konten akan diisi oleh JavaScript -->
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<!-- ✅ MODAL REVIEW & SCRIPT JS REVIEW DIHAPUS TOTAL -->
+<script>
+// Fungsi untuk menampilkan modal detail pesanan
+function showOrderDetail(orderData) {
+    const modalBody = document.getElementById('modalBodyContent');
+    
+    // Format tanggal
+    const orderDate = new Date(orderData.created_at);
+    const formattedDate = orderDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) + ' ' + orderDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+
+    // Generate HTML untuk items
+    let itemsHtml = '';
+    orderData.items.forEach(item => {
+        // ✅ PERBAIKAN: Ambil nama produk dengan benar
+        let productName = item.name || item.product_name || 'Produk';
+        
+        let imgSrc = item.image || 'assets/images/placeholder.png';
+        // Perbaikan path gambar sederhana di JS jika perlu
+        if(imgSrc && !imgSrc.startsWith('http') && !imgSrc.startsWith('uploads/')) {
+             imgSrc = 'uploads/' + imgSrc;
+        }
+        
+        itemsHtml += `
+        <div class="modal-product-item">
+            <img src="${imgSrc}" alt="${productName}" class="modal-product-img" onerror="this.src='assets/images/placeholder.png'">
+            <div class="modal-product-info">
+                <div class="modal-product-name">${productName}</div>
+                ${item.variant ? `<div class="modal-product-variant">Varian: ${item.variant}</div>` : ''}
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                    <div class="modal-product-price">Rp${parseInt(item.price).toLocaleString('id-ID')}</div>
+                    <div class="text-muted">x${item.qty}</div>
+                </div>
+            </div>
+        </div>
+        `;
+    });
+
+    // Generate HTML untuk summary
+    const subtotal = parseInt(orderData.total_price); // Asumsi total_price adalah subtotal jika ongkir gratis
+    const shipping = 0; // Gratis
+    const total = subtotal + shipping;
+
+    // Generate HTML untuk tombol batal
+    let cancelBtnHtml = '';
+    // Hanya tampilkan tombol batal jika statusnya masih bisa dibatalkan
+    if(orderData.status === 'Menunggu Konfirmasi' || orderData.status === 'Pending') {
+        // ✅ PERBAIKAN: Link ke halaman ini sendiri dengan parameter cancel_order
+        cancelBtnHtml = `<a href="?cancel_order=${orderData.id}" class="btn-cancel-order" onclick="return confirm('Yakin ingin membatalkan pesanan ini?')">Batalkan Pesanan</a>`;
+    }
+
+    modalBody.innerHTML = `
+        <!-- Status Header -->
+        <div class="modal-detail-header text-center">
+            <div class="mb-2">
+                <i class="fas ${getStatusIcon(orderData.status)} fa-3x" style="color: ${getStatusColor(orderData.status)}"></i>
+            </div>
+            <div class="modal-status-title" style="color: ${getStatusColor(orderData.status)}">${orderData.status}</div>
+            <div class="modal-status-desc">${getStatusDesc(orderData.status)}</div>
+        </div>
+
+        <!-- Alamat Pengiriman -->
+        <div class="modal-section">
+            <h6><i class="fas fa-map-marker-alt text-danger me-2"></i>Alamat Pengiriman</h6>
+            <div class="modal-address">
+                <strong>${orderData.customer_name}</strong> (${orderData.customer_phone})<br>
+                ${orderData.customer_address}, ${orderData.customer_city}, ${orderData.customer_province}
+            </div>
+        </div>
+
+        <!-- Daftar Produk -->
+        <div class="modal-section">
+            <h6><i class="fas fa-box me-2"></i>Produk (${orderData.items.length} item)</h6>
+            ${itemsHtml}
+        </div>
+
+        <!-- Rincian Pembayaran -->
+        <div class="modal-section">
+            <h6><i class="fas fa-file-invoice-dollar me-2"></i>Rincian Pembayaran</h6>
+            <div class="modal-summary-row">
+                <span class="text-muted">Subtotal Produk</span>
+                <span>Rp${subtotal.toLocaleString('id-ID')}</span>
+            </div>
+            <div class="modal-summary-row">
+                <span class="text-muted">Biaya Pengiriman</span>
+                <span class="text-success">Gratis</span>
+            </div>
+            <div class="modal-summary-row modal-summary-total">
+                <span>Total Pesanan</span>
+                <span style="color: var(--primary)">Rp${total.toLocaleString('id-ID')}</span>
+            </div>
+            <div class="mt-2 small text-muted">
+                Metode Pembayaran: <span class="fw-bold text-dark">${orderData.payment_method || 'COD'}</span>
+            </div>
+        </div>
+
+        <!-- Informasi Pesanan -->
+        <div class="modal-section">
+            <h6><i class="fas fa-info-circle me-2"></i>Informasi Pesanan</h6>
+            <div class="modal-info-row">
+                <span class="modal-info-label">Nomor Pesanan</span>
+                <span class="modal-info-value">#${orderData.id.toString().padStart(4, '0')}</span>
+            </div>
+            <div class="modal-info-row">
+                <span class="modal-info-label">Tanggal Pemesanan</span>
+                <span class="modal-info-value">${formattedDate}</span>
+            </div>
+            ${orderData.resi_number ? `
+            <div class="modal-info-row">
+                <span class="modal-info-label">No. Resi</span>
+                <span class="modal-info-value">${orderData.resi_number}</span>
+            </div>
+            ` : ''}
+        </div>
+
+        <!-- Tombol Aksi -->
+        <div class="modal-section border-0 pb-0">
+            ${cancelBtnHtml}
+        </div>
+    `;
+
+    const modal = new bootstrap.Modal(document.getElementById('orderDetailModal'));
+    modal.show();
+}
+
+// Helper functions untuk status
+function getStatusIcon(status) {
+    switch(status) {
+        case 'Selesai': return 'fa-check-circle';
+        case 'Dikirim': return 'fa-shipping-fast';
+        case 'Menunggu Konfirmasi': return 'fa-clock';
+        case 'Dibatalkan': return 'fa-times-circle';
+        default: return 'fa-info-circle';
+    }
+}
+
+function getStatusColor(status) {
+    switch(status) {
+        case 'Selesai': return '#4CAF50';
+        case 'Dikirim': return '#2196F3';
+        case 'Menunggu Konfirmasi': return '#FF9800';
+        case 'Dibatalkan': return '#F44336';
+        default: return '#9E9E9E';
+    }
+}
+
+function getStatusDesc(status) {
+    switch(status) {
+        case 'Selesai': return 'Pesanan Anda telah diterima.';
+        case 'Dikirim': return 'Pesanan sedang dalam perjalanan.';
+        case 'Menunggu Konfirmasi': return 'Pesanan Anda menunggu konfirmasi penjual.';
+        case 'Dibatalkan': return 'Pesanan ini telah dibatalkan.';
+        default: return 'Status pesanan sedang diproses.';
+    }
+}
+</script>
 
 </body>
 </html>

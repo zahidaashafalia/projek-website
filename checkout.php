@@ -1,4 +1,5 @@
 <?php 
+session_start(); // Pastikan session dimulai
 include 'config.php'; 
 
 // ==========================================
@@ -21,7 +22,7 @@ function sendWhatsAppNotification($phone, $message) {
     $encodedMessage = urlencode($message);
     
     // OPSI 1: Menggunakan API Gateway (Contoh: Fonnte, Wablas)
-    // Uncomment dan isi Token jika punya API
+    // Uncomment dan isi Token jika punya API agar notifikasi otomatis terkirim
     /*
     $curl = curl_init();
     curl_setopt_array($curl, array(
@@ -40,7 +41,7 @@ function sendWhatsAppNotification($phone, $message) {
     return $response;
     */
 
-    // OPSI 2: Fallback (Kosongkan jika tidak ada API)
+    // OPSI 2: Fallback (Kosongkan jika tidak ada API, notifikasi hanya tercatat di log/server)
     return true;
 }
 
@@ -83,10 +84,11 @@ function notifyOrderCreated($conn, $phone, $order_id, $order_number, $total, $it
 $grand_total = 0;
 $total_items = 0;
 
-// 1. Logika Update Quantity & Hapus
+// 1. Logika Update Quantity, Hapus, & GANTI VARIAN
 if(isset($_GET['action'])){
     $index = $_GET['index'];
     $action = $_GET['action'];
+    
     if(isset($_SESSION['cart'][$index])){
         if($action == 'plus'){
             $_SESSION['cart'][$index]['qty']++;
@@ -100,6 +102,10 @@ if(isset($_GET['action'])){
         } elseif($action == 'remove'){
             unset($_SESSION['cart'][$index]);
             $_SESSION['cart'] = array_values($_SESSION['cart']);
+        } elseif($action == 'change_variant'){
+            // Logika Ganti Varian
+            $newVariant = isset($_GET['variant']) ? $_GET['variant'] : 'Regular';
+            $_SESSION['cart'][$index]['variant'] = $newVariant;
         }
     }
     header("Location: checkout.php");
@@ -279,16 +285,6 @@ body {
     text-decoration: none;
 }
 .nav-icons a:hover { color: var(--primary); }
-.nav-icon-btn {
-    background: none;
-    border: none;
-    color: var(--text-dark);
-    font-size: 1.2rem;
-    cursor: pointer;
-    position: relative;
-    transition: color 0.3s;
-}
-.nav-icon-btn:hover { color: var(--primary); }
 .cart-badge-nav, .notif-count {
     position: absolute;
     top: -8px;
@@ -406,6 +402,7 @@ body {
     align-items: flex-start;
     border-bottom: 1px solid #f5f0eb;
     transition: background .15s;
+    position: relative; /* Untuk posisi tombol hapus jika perlu */
 }
 .cart-item:last-child { border-bottom: none; }
 .cart-item:hover { background: #fdfaf7; }
@@ -419,7 +416,8 @@ body {
     margin-top: 30px;
 }
 
-.item-image {
+/* Style Baru untuk Gambar Klikable */
+.item-image-wrapper {
     width: 110px;
     height: 110px;
     border-radius: 6px;
@@ -429,13 +427,31 @@ body {
     border: 1px solid var(--border);
     cursor: pointer;
     transition: transform .2s;
+    position: relative;
 }
-.item-image:hover { transform: scale(1.03); }
-.item-image img {
+.item-image-wrapper:hover { 
+    transform: scale(1.03); 
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+.item-image-wrapper img {
     width: 100%;
     height: 100%;
     object-fit: cover;
 }
+.zoom-hint {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.6);
+    color: white;
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+.item-image-wrapper:hover .zoom-hint { opacity: 1; }
+
 .item-image-placeholder {
     width: 110px;
     height: 110px;
@@ -476,22 +492,23 @@ body {
     -webkit-box-orient: vertical;
 }
 
-.variant-pill {
+/* Style Baru untuk Dropdown Varian */
+.variant-select {
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    background: #f5f0eb;
+    background: #fff;
     border: 1px solid var(--border);
     border-radius: 4px;
-    padding: 4px 10px;
+    padding: 4px 8px;
     font-size: 0.8rem;
     color: var(--text-dark);
     margin-bottom: 8px;
     cursor: pointer;
-    transition: border-color .2s;
+    outline: none;
 }
-.variant-pill:hover { border-color: var(--primary); }
-.variant-pill i { font-size: 0.72rem; color: var(--text-gray); }
+.variant-select:focus { border-color: var(--primary); }
+.variant-select option { padding: 5px; }
 
 /* Price row - Cleaned up */
 .item-price-row {
@@ -504,7 +521,7 @@ body {
 .item-price {
     font-size: 1.05rem;
     font-weight: 800;
-    color: var(--primary); /* Changed from red to primary for cleaner look */
+    color: var(--primary);
 }
 
 .sold-count {
@@ -784,7 +801,7 @@ body {
     .page-header { top: 58px; }
 }
 @media (max-width: 600px) {
-    .item-image, .item-image-placeholder { width: 90px; height: 90px; }
+    .item-image-wrapper, .item-image-placeholder { width: 90px; height: 90px; }
     .checkout-btn { padding: 12px 20px; min-width: 100px; }
     .bottom-bar-right { gap: 12px; }
 }
@@ -864,19 +881,25 @@ body {
             $itemPrice    = (float)$item['price'];
             $itemQty      = (int)$item['qty'];
             $subtotal     = $itemPrice * $itemQty;
+            $currentVariant = isset($item['variant']) ? $item['variant'] : 'Regular';
+            
+            // Daftar opsi varian (Hardcoded untuk contoh, bisa dinamis dari DB jika perlu)
+            $variants = ['Regular', 'Level 1', 'Level 2', 'Level 3', 'Level 4', 'Level 5', 'Large', 'Medium', 'Paket Nasi'];
         ?>
         <div class="cart-item" id="item-<?= $index ?>">
             <input type="checkbox" class="item-check item-checkbox" checked
                 onchange="updateTotal()" data-price="<?= $subtotal ?>">
 
+            <!-- ✅ GAMBAR KLIKABLE UNTUK DETAIL -->
             <?php if(!empty($item['image'])): ?>
-            <div class="item-image" onclick="window.location='index.php'">
-                <img src="<?= htmlspecialchars($item['image']) ?>"
-                     alt="<?= htmlspecialchars($item['name']) ?>"
-                     onerror="this.parentElement.innerHTML='<div style=\'display:flex;align-items:center;justify-content:center;height:100%;font-size:2rem;color:#8B6F4E;opacity:.4\'><i class=\'fas fa-utensils\'></i></div>'">
+            <div class="item-image-wrapper" onclick="showDetailModal(<?= $index ?>)">
+                <img src="<?= htmlspecialchars($item['image']) ?>" alt="<?= htmlspecialchars($item['name']) ?>">
+                <div class="zoom-hint"><i class="fas fa-search-plus"></i></div>
             </div>
             <?php else: ?>
-            <div class="item-image-placeholder"><i class="fas fa-utensils"></i></div>
+            <div class="item-image-placeholder" onclick="showDetailModal(<?= $index ?>)" style="cursor:pointer;">
+                <i class="fas fa-utensils"></i>
+            </div>
             <?php endif; ?>
 
             <div class="item-body">
@@ -886,23 +909,18 @@ body {
 
                 <div class="item-name"><?= htmlspecialchars($item['name']) ?></div>
 
-                <?php if(!empty($item['variant'])): ?>
-                <div class="variant-pill">
-                    <?= htmlspecialchars($item['variant']) ?>
-                    <i class="fas fa-chevron-down"></i>
-                </div>
-                <?php endif; ?>
-
-                <!-- ✅ FLASH SALE DIHAPUS -->
+                <!-- ✅ DROPDOWN GANTI VARIAN -->
+                <select class="variant-select" onchange="changeVariant(<?= $index ?>, this.value)">
+                    <?php foreach($variants as $v): ?>
+                        <option value="<?= $v ?>" <?= ($currentVariant == $v) ? 'selected' : '' ?>><?= $v ?></option>
+                    <?php endforeach; ?>
+                </select>
 
                 <div class="item-price-row">
                     <span class="item-price">Rp<?= number_format($itemPrice, 0, ',', '.') ?></span>
-                    <!-- ✅ HARGA CORET & DISKON DIHAPUS -->
                 </div>
 
                 <div class="sold-count"><?= rand(5,50) ?> terjual kemarin</div>
-
-                <!-- ✅ BONUS LINE DIHAPUS -->
 
                 <!-- Qty Control -->
                 <div class="qty-row">
@@ -916,8 +934,6 @@ body {
                 </div>
             </div>
         </div>
-
-        <!-- ✅ DISKON VOUCHER PER ITEM DIHAPUS -->
 
         <?php endforeach; ?>
 
@@ -1063,11 +1079,82 @@ body {
     </div>
 </div>
 
+<!-- ✅ MODAL DETAIL PRODUK BARU -->
+<div class="modal fade" id="detailProductModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title">Detail Produk</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center pt-0">
+                <img id="modalDetailImg" src="" class="img-fluid rounded mb-3" style="max-height: 250px; object-fit: contain;">
+                <h4 id="modalDetailName" class="mb-1"></h4>
+                <p id="modalDetailVariant" class="text-muted small mb-2"></p>
+                <h3 id="modalDetailPrice" class="text-primary fw-bold mb-3"></h3>
+                <div class="d-flex justify-content-center align-items-center gap-3 mb-4">
+                    <span class="fw-bold">Jumlah:</span>
+                    <span id="modalDetailQty" class="badge bg-secondary fs-6"></span>
+                </div>
+                <hr>
+                <button onclick="deleteFromModal()" class="btn btn-danger w-100">
+                    <i class="fas fa-trash me-2"></i>Hapus Item Ini
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+// Variabel global untuk menyimpan index item yang sedang dilihat di modal
+let currentDetailIndex = null;
+
 // QTY UPDATE
 function updateQty(index, change) {
     window.location.href = `?action=${change > 0 ? 'plus' : 'minus'}&index=${index}`;
+}
+
+// ✅ FUNGSI GANTI VARIAN
+function changeVariant(index, newVariant) {
+    window.location.href = `?action=change_variant&index=${index}&variant=${encodeURIComponent(newVariant)}`;
+}
+
+// ✅ FUNGSI TAMPILKAN MODAL DETAIL
+function showDetailModal(index) {
+    currentDetailIndex = index;
+    
+    // Ambil data dari elemen HTML yang sudah ada
+    const itemRow = document.querySelectorAll('.cart-item')[index];
+    const imgSrc = itemRow.querySelector('.item-image-wrapper img')?.src || itemRow.querySelector('.item-image-placeholder') ? '' : '';
+    const name = itemRow.querySelector('.item-name').innerText;
+    const variant = itemRow.querySelector('.variant-select').value;
+    const price = itemRow.querySelector('.item-price').innerText;
+    const qty = itemRow.querySelector('.qty-value').innerText;
+    
+    // Jika placeholder, gunakan gambar default atau kosong
+    let finalImg = imgSrc;
+    if(itemRow.querySelector('.item-image-placeholder')) {
+        finalImg = 'assets/images/placeholder.png'; // Ganti dengan path placeholder Anda
+    }
+
+    document.getElementById('modalDetailImg').src = finalImg;
+    document.getElementById('modalDetailName').innerText = name;
+    document.getElementById('modalDetailVariant').innerText = "Varian: " + variant;
+    document.getElementById('modalDetailPrice').innerText = price;
+    document.getElementById('modalDetailQty').innerText = qty;
+    
+    const modal = new bootstrap.Modal(document.getElementById('detailProductModal'));
+    modal.show();
+}
+
+// ✅ FUNGSI HAPUS DARI MODAL
+function deleteFromModal() {
+    if(currentDetailIndex !== null) {
+        if(confirm('Yakin ingin menghapus item ini dari keranjang?')) {
+            window.location.href = `?action=remove&index=${currentDetailIndex}`;
+        }
+    }
 }
 
 // SHOW CHECKOUT MODAL
