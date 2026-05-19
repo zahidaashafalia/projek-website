@@ -115,17 +115,22 @@ if(isset($_POST['add_to_cart'])){
 }
 
 // Ambil produk dari database
-$check_col = mysqli_query($conn, "SHOW COLUMNS FROM products LIKE 'is_available'");
-$has_available = mysqli_num_rows($check_col) > 0;
-
-$where = $has_available ? "WHERE p.is_available = 1" : "";
+// Ambil produk dari database (AMBIL SEMUA, JANGAN DIFILTER)
 $joinCat = "LEFT JOIN categories c ON p.category_id = c.id";
 $selectCat = "c.name as category_name";
-
-$result = mysqli_query($conn, "SELECT p.*, {$selectCat} FROM products p $joinCat $where ORDER BY p.created_at DESC");
+// Kita ambil semua produk, nanti kita cek statusnya di HTML
+$result = mysqli_query($conn, "SELECT p.*, {$selectCat} FROM products p $joinCat ORDER BY p.created_at DESC");
 
 $products = [];
 while($row = mysqli_fetch_assoc($result)){
+    // Cek kolom is_available atau stock
+    $isAvailable = 1; // Default tersedia
+    if(isset($row['is_available'])) {
+        $isAvailable = (int)$row['is_available'];
+    } elseif(isset($row['stock'])) {
+        $isAvailable = ($row['stock'] > 0) ? 1 : 0;
+    }
+
     $products[] = [
         'id' => $row['id'],
         'name' => $row['name'],
@@ -133,8 +138,11 @@ while($row = mysqli_fetch_assoc($result)){
         'category' => $row['category_name'] ?? 'all',
         'image' => !empty($row['image']) ? 'uploads/' . $row['image'] : '',
         'description' => $row['description'] ?? '',
+        'is_available' => $isAvailable, // <--- PENTING: Simpan status ketersediaan
         'has_variant' => false,
-        'variants' => []
+        'variants' => [],
+        'toppings' => [], // Siapkan array kosong dulu
+        'levels' => []    // Siapkan array kosong dulu
     ];
 }
 // 🔥 Ambil toppings & levels untuk setiap produk
@@ -246,6 +254,42 @@ if(isset($_SESSION['user_phone'])){
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 <style>
+    /* Efek Produk Tidak Tersedia */
+.product-card.unavailable {
+    opacity: 0.6; /* Membuat transparan/abu-abu */
+    filter: grayscale(80%); /* Membuat gambar hitam putih */
+    pointer-events: none; /* MENCEGAH KLIK pada area kartu */
+    position: relative;
+}
+
+/* Overlay Tulisan Stok Habis */
+.out-of-stock-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    border-radius: 20px; /* Sesuaikan dengan radius product-card */
+}
+
+.out-of-stock-overlay span {
+    background: #dc3545; /* Warna Merah */
+    color: white;
+    padding: 8px 15px;
+    font-weight: bold;
+    font-size: 0.9rem;
+    border-radius: 20px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    transform: rotate(-5deg);
+}
+
+/* Aktifkan kembali klik hanya untuk tombol Favorit jika mau */
+.product-card.unavailable .favorite-btn {
+    pointer-events: auto; 
+    z-index: 11;
+}
 :root {
     --primary: #8B6F4E;
     --primary-dark: #6B5637;
@@ -1359,51 +1403,78 @@ body {
         <button class="tab-btn" data-filter="minuman">Minuman</button>
     </div>
 
-    <!-- Products Grid -->
-    <div class="products-grid">
-        <?php foreach($products as $p): 
+<!-- Products Grid -->
+<div class="products-grid">
+    <?php foreach($products as $p): 
         $category = strtolower($p['category'] ?? 'all');
-        ?>
-      <div class="product-card" 
-data-bs-toggle="modal"
-data-bs-target="#modalDetail"
-data-id="<?= $p['id'] ?>"
-data-name="<?= $p['name'] ?>"
-data-price="<?= $p['price'] ?>"
-data-desc="<?= $p['description'] ?>"
-data-img="<?= $p['image'] ?>"
-data-category="<?= $category ?>"
-data-has-variant="0"
-data-variants='[]'
-data-toppings='<?= htmlspecialchars(json_encode($p['toppings']), ENT_QUOTES) ?>'
-data-levels='<?= htmlspecialchars(json_encode($p['levels']), ENT_QUOTES) ?>'>
+        
+        // Cek ketersediaan produk (default 1 jika kolom tidak ada)
+        $isAvail = $p['is_available'] ?? 1; 
+        
+        // Tambahkan class 'unavailable' jika stok habis
+        $classUnavailable = ($isAvail == 0) ? 'unavailable' : '';
+    ?>
+    
+    <!-- PERBAIKAN: Kembalikan data-bs-toggle dan data-bs-target agar Modal Detail muncul -->
+    <!-- Tambahkan class <?= $classUnavailable ?> untuk efek abu-abu -->
+    <div class="product-card <?= $classUnavailable ?>"
+         data-bs-toggle="modal"
+         data-bs-target="#modalDetail"
+         data-id="<?= $p['id'] ?>"
+         data-name="<?= $p['name'] ?>"
+         data-price="<?= $p['price'] ?>"
+         data-desc="<?= $p['description'] ?>"
+         data-img="<?= $p['image'] ?>"
+         data-category="<?= $category ?>"
+         data-has-variant="0"
+         data-variants='[]'
+         data-toppings='<?= htmlspecialchars(json_encode($p['toppings']), ENT_QUOTES) ?>'
+         data-levels='<?= htmlspecialchars(json_encode($p['levels']), ENT_QUOTES) ?>'>
 
-            <div class="product-image">
-                <button class="favorite-btn" onclick="toggleFavorite(this, event)">
-                    <i class="far fa-heart"></i>
-                </button>
-                <?php if(!empty($p['image'])): ?>
+        <div class="product-image">
+            <button class="favorite-btn" onclick="toggleFavorite(this, event)">
+                <i class="far fa-heart"></i>
+            </button>
+            
+            <!-- Overlay Stok Habis (Muncul jika is_available = 0) -->
+            <?php if($isAvail == 0): ?>
+                <div class="out-of-stock-overlay">
+                    <span>Stok Habis</span>
+                </div>
+            <?php endif; ?>
+
+            <?php if(!empty($p['image'])): ?>
                 <img src="<?= $p['image'] ?>" alt="<?= $p['name'] ?>" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
                 <i class="fas fa-utensils" style="display: none; font-size: 5rem; color: var(--primary); opacity: 0.3;"></i>
-                <?php else: ?>
+            <?php else: ?>
                 <i class="fas fa-utensils"></i>
+            <?php endif; ?>
+        </div>
+
+        <div class="product-info">
+            <h3 class="product-name"><?= $p['name'] ?></h3>
+            <p class="product-desc"><?= $p['description'] ?></p>
+            <div class="product-footer">
+                <span class="product-price">Rp <?= number_format($p['price'], 0, ',', '.') ?></span>
+                
+                <?php if($isAvail == 1): ?>
+                    <!-- Jika Tersedia: Tombol Aktif -->
+                    <button 
+                        onclick="openVariantFromCard(<?= $p['id'] ?>, '<?= addslashes($p['name']) ?>', <?= $p['price'] ?>, '<?= $p['image'] ?>', '<?= strtolower($p['category']) ?>', '<?= htmlspecialchars(json_encode($p['levels']), ENT_QUOTES) ?>', '<?= htmlspecialchars(json_encode($p['toppings']), ENT_QUOTES) ?>')" 
+                        style="background: var(--primary); color: white; border: none; padding: 6px 12px; border-radius: 15px; font-weight: 600; cursor: pointer; font-size: 0.8rem;">
+                        <i class="fas fa-cart-plus"></i> Tambah
+                    </button>
+                <?php else: ?>
+                    <!-- Jika Tidak Tersedia: Tombol Disabled/Grey -->
+                    <button disabled style="background: #ccc; color: #666; border: none; padding: 6px 12px; border-radius: 15px; font-weight: 600; cursor: not-allowed; font-size: 0.8rem;">
+                        Habis
+                    </button>
                 <?php endif; ?>
             </div>
-
-            <div class="product-info">
-                <h3 class="product-name"><?= $p['name'] ?></h3>
-                <p class="product-desc"><?= $p['description'] ?></p>
-                <div class="product-footer">
-    <span class="product-price">Rp <?= number_format($p['price'], 0, ',', '.') ?></span>
-    <button 
-        onclick="openVariantFromCard(<?= $p['id'] ?>, '<?= addslashes($p['name']) ?>', <?= $p['price'] ?>, '<?= $p['image'] ?>', '<?= strtolower($p['category']) ?>', '<?= htmlspecialchars(json_encode($p['levels']), ENT_QUOTES) ?>', '<?= htmlspecialchars(json_encode($p['toppings']), ENT_QUOTES) ?>')" 
-        style="background: var(--primary); color: white; border: none; padding: 6px 12px; border-radius: 15px; font-weight: 600; cursor: pointer; font-size: 0.8rem;">
-<i class="fas fa-cart-plus"></i> Tambah
-</button>
-</div>
-            </div>
         </div>
-        <?php endforeach; ?>
+    </div>
+    <?php endforeach; ?>
+</div>
     </div>
 
 </section>

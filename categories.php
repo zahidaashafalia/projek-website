@@ -139,11 +139,19 @@ $categories = mysqli_query($conn, "SELECT c.*, COUNT(p.id) as product_count
     <li><a href="products.php"><i class="fas fa-utensils"></i><span>Produk</span></a></li>
     <li><a href="categories.php"><i class="fas fa-tags"></i><span>Kategori</span></a></li>
     <li><a href="customers.php" class="<?= ($currentPage ?? '') == 'customers.php' ? 'active' : '' ?>"><i class="fas fa-users"></i><span>Pelanggan</span></a></li>
+    
+    <!-- ✅ MENU BARU: Kelola Gambar -->
     <li><a href="manage-images.php" class="<?= ($currentPage ?? '') == 'manage-images.php' ? 'active' : '' ?>"><i class="fas fa-images"></i><span>Kelola Gambar</span></a></li>
+    
     <li><a href="admin_topping.php" class="<?= ($currentPage ?? '') == 'admin_topping.php' ? 'active' : '' ?>">
     <i class="fas fa-pepper-hot"></i><span>Topping & Level</span>
 </a></li>
-
+<li>
+    <a href="admin_store_profile.php" class="<?= ($currentPage == 'admin_store_profile.php') ? 'active' : '' ?>">
+        <i class="fas fa-store"></i>
+        <span>Profil Toko</span>
+    </a>
+</li>
     <li><a href="settings.php"><i class="fas fa-cog"></i><span>Pengaturan</span></a></li>
 </ul>
 </aside>
