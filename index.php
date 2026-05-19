@@ -1,5 +1,6 @@
 <?php include 'config.php';
 
+
 // 🔥 AMBIL SETTINGS + STORE PROFILE DARI DATABASE 🔥
 $settings = [];
 $profile = [];
@@ -1269,13 +1270,6 @@ body {
             <li><a href="riwayat.php">Pesanan</a></li>
         </ul>
         <div class="nav-icons">
-            <!-- Notification Icon -->
-            <button class="nav-icon-btn" onclick="showNotifications()">
-                <i class="fas fa-bell"></i>
-                <?php if($totalNotifications > 0): ?>
-                <span class="notif-count"><?= $totalNotifications ?></span>
-                <?php endif; ?>
-            </button>
             
             <!-- Cart Icon -->
             <a href="checkout.php">
@@ -2016,39 +2010,6 @@ document.getElementById('trackingInput')?.addEventListener('keypress', function(
                     <span style="position: absolute; bottom: 12px; right: 12px; background: rgba(0,0,0,0.6); color: white; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem;">1/1</span>
                 </div>
 
-<!-- Flash Sale Banner -->
-<div style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); padding: 12px 16px; color: white;">
-    <div style="display: flex; align-items: center; justify-content: space-between;">
-        <div>
-            <span style="background: white; color: var(--primary); padding: 2px 8px; border-radius: 4px; font-weight: 700; font-size: 0.85rem; margin-right: 8px;">-58%</span>
-            <span style="font-weight: 600;">Mulai <span id="md-price-flash" style="font-size: 1.3rem; font-weight: 800;"></span></span>
-        </div>
-        <div style="text-align: right;">
-            <div style="display: flex; align-items: center; gap: 6px;">
-                <i class="fas fa-bolt" style="color: #FFD700;"></i>
-                <span style="font-weight: 700;">Flash Sale</span>
-            </div>
-            <div style="font-size: 0.8rem; opacity: 0.9;">Berakhir dalam 07:04:20</div>
-        </div>
-    </div>
-</div>
-
-                <!-- PayLater Info -->
-                <div style="padding: 12px 16px; border-bottom: 1px solid #f0f0f0;">
-                    <div style="font-size: 0.85rem; color: #666;">
-                        <i class="fas fa-credit-card" style="color: #6d5236; margin-right: 6px;"></i>
-                        PayLater dari Rp<span id="md-paylater">0</span>/bln | <span style="background: rgba(139,111,78,0.1); color: var(--primary); padding: 2px 8px; border-radius: 4px; font-size: 0.8rem;">Aktifkan batas kredit hingga Rp50 JT</span>
-                        <i class="fas fa-chevron-right" style="float: right; color: #999;"></i>
-                    </div>
-                </div>
-
-                <!-- Discount Badge -->
-                <div style="padding: 8px 16px; background: rgba(139,111,78,0.1);">
-                <span style="background: rgba(139,111,78,0.2); color: var(--primary); padding: 2px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: 600;">
-                <i class="fas fa-tag" style="margin-right: 4px;"></i>Diskon Rp15rb
-                </span>
-                </div>
-
                 <!-- Product Name & Rating -->
                 <div style="padding: 16px; border-bottom: 1px solid #f0f0f0;">
                     <h3 id="md-name" style="font-size: 1.1rem; font-weight: 600; margin-bottom: 8px; line-height: 1.4;"></h3>
@@ -2063,103 +2024,17 @@ document.getElementById('trackingInput')?.addEventListener('keypress', function(
                         <i class="far fa-bookmark" style="margin-left: auto; color: #999; font-size: 1.2rem;"></i>
                     </div>
                 </div>
-
-                <!-- Shipping Info -->
-                <div style="padding: 12px 16px; border-bottom: 1px solid #f0f0f0;">
-                    <div style="display: flex; align-items: flex-start; gap: 8px; font-size: 0.9rem;">
-                       <i class="fas fa-truck" style="color: var(--primary); margin-top: 3px;"></i>
-                        <div style="flex: 1;">
-                            <span style="background: rgba(139,111,78,0.15); color: var(--primary); padding: 2px 6px; border-radius: 4px; font-size: 0.8rem;">Pengiriman gratis</span>
-                            <span style="color: #333; margin-left: 6px;">Dijamin tiba paling lambat pada 14-16 Mei</span>
-                        </div>
-                    </div>
-                    <div style="margin-top: 8px; padding-left: 28px; font-size: 0.85rem; color: #666;">
-                        Dapatkan voucher senilai min. Rp25K jika pesanan terlambat tiba
-                        <i class="fas fa-info-circle" style="margin-left: 4px;"></i>
-                    </div>
-                    <div style="margin-top: 6px; padding-left: 28px; font-size: 0.85rem; color: #666;">
-                        Ongkir: Rp20.500
-                    </div>
-                </div>
-
-                <!-- Protection -->
-                <div style="padding: 12px 16px; border-bottom: 1px solid #f0f0f0;">
-                    <div style="display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: #333;">
-                        <i class="fas fa-shield-alt" style="color: #666;"></i>
-                        <span>Proteksi Rusak Total | Bayar di tempat | Pengembalian Gratis</span>
-                        <i class="fas fa-chevron-right" style="margin-left: auto; color: #999;"></i>
-                    </div>
-                </div>
-
-                <!-- Variants -->
-                <div style="padding: 12px 16px; border-bottom: 1px solid #f0f0f0;">
-                    <div style="display: flex; align-items: center; gap: 12px;">
-                        <i class="fas fa-th" style="color: #666;"></i>
-                        <span style="flex: 1; font-size: 0.9rem;">4 opsi tersedia</span>
-                        <i class="fas fa-chevron-right" style="color: #999;"></i>
-                    </div>
-                </div>
-
- <!-- Voucher & Promo -->
-<div style="padding: 16px; border-bottom: 1px solid #f0f0f0;">
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-        <h4 style="font-size: 1.1rem; font-weight: 600; margin: 0;">Voucher & Promo</h4>
-        <i class="fas fa-chevron-right" style="color: #999;"></i>
-    </div>
-    <div style="display: flex; gap: 12px; overflow-x: auto;">
-        <div style="background: rgba(139,111,78,0.05); border: 1px solid var(--primary); border-radius: 8px; padding: 12px; min-width: 280px; flex-shrink: 0;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <i class="fas fa-truck" style="color: var(--primary); font-size: 1.5rem;"></i>
-                <div style="flex: 1;">
-                    <div style="font-weight: 700; color: var(--primary); font-size: 1.1rem;">Diskon Rp30rb</div>
-                    <div style="font-size: 0.8rem; color: #666;">untuk pesanan di atas Rp20rb</div>
-                </div>
-                <button style="background: var(--primary); border: 1px solid var(--primary); color: white; padding: 6px 16px; border-radius: 20px; font-weight: 600; font-size: 0.85rem;">Gunakan</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-                <!-- PayLater Section -->
-                <div style="padding: 16px; border-bottom: 1px solid #f0f0f0;">
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <div>
-                            <h4 style="font-size: 1.1rem; font-weight: 600; margin: 0 0 4px 0;">PayLater</h4>
-                            <i class="fas fa-credit-card" style="color: var(--primary); margin-right: 6px;"></i>
-                        </div>
-                        <i class="fas fa-chevron-right" style="color: #999;"></i>
-                    </div>
-                </div>
-
-                <!-- Reviews Section -->
-                <div style="padding: 16px; border-bottom: 1px solid #f0f0f0;">
-                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
-                        <h4 style="font-size: 1.1rem; font-weight: 600; margin: 0;">Ulasan</h4>
-                        <span style="color: #999; font-size: 0.9rem;">(28)</span>
-                    </div>
                     
-                    <!-- Review Item -->
-                    <div style="margin-bottom: 20px;">
-                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                            <div style="width: 32px; height: 32px; border-radius: 50%; background: #f0f0f0; display: flex; align-items: center; justify-content: center; font-weight: 600; color: #666;">**</div>
-                            <div style="color: #FFB800;">
-                                <i class="fas fa-star"></i>
-                                <i class="fas fa-star"></i>
-                                <i class="fas fa-star"></i>
-                                <i class="fas fa-star"></i>
-                                <i class="fas fa-star"></i>
-                            </div>
-                        </div>
-                        <div style="font-size: 0.85rem; color: #666; margin-bottom: 4px;">Varian: PUTIH</div>
-                        <div style="font-size: 0.9rem; color: #333; line-height: 1.5;">Kapasitas:lumayan luas, uang sm make'up kecil masi bisa masuk hih...</div>
-                        <div style="display: flex; gap: 8px; margin-top: 12px; overflow-x: auto;">
-                            <img src="https://via.placeholder.com/80" style="width: 80px; height: 80px; object-fit: cover; border-radius: 8px;">
-                            <img src="https://via.placeholder.com/80" style="width: 80px; height: 80px; object-fit: cover; border-radius: 8px;">
-                            <img src="https://via.placeholder.com/80" style="width: 80px; height: 80px; object-fit: cover; border-radius: 8px;">
-                            <div style="width: 80px; height: 80px; background: #333; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; flex-shrink: 0;">+2</div>
-                        </div>
-                    </div>
-                </div>
+                   <!-- ✅ DESKRIPSI PRODUK (PENGGANTI BAGIAN YANG DIHAPUS) -->
+<div style="padding: 16px; border-bottom: 1px solid #f0f0f0;">
+    <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 8px; color: var(--text-dark);">
+        <i class="fas fa-info-circle me-2" style="color: var(--primary);"></i>Deskripsi Produk
+    </h4>
+    <p id="md-desc" style="font-size: 0.9rem; color: var(--text-gray); line-height: 1.6; margin: 0;">
+        <!-- Isi deskripsi akan diisi otomatis oleh JavaScript saat modal dibuka -->
+        Memuat deskripsi...
+    </p>
+</div>
 
                 <!-- Store Info -->
                 <div style="display: flex; align-items: center; gap: 12px;">
@@ -2184,16 +2059,6 @@ document.getElementById('trackingInput')?.addEventListener('keypress', function(
     </div>
     <button onclick="showStoreProfile()" style="background: var(--primary); border: none; padding: 8px 16px; border-radius: 20px; font-weight: 600; color: white; cursor: pointer;">Kunjungi</button>
 </div>
-                <!-- Komisi Section -->
-                <div style="padding: 12px 16px; background: #FFF8E1; border-bottom: 1px solid #f0f0f0;">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <i class="fas fa-fire" style="color: #FF9800;"></i>
-                        <span style="flex: 1; font-size: 0.9rem;">Bagikan untuk mendapatkan <strong style="color: #FF5858;">Rp5.000</strong> per penjualan</span>
-                        <i class="fas fa-chevron-up" style="color: #999;"></i>
-                    </div>
-                    <div style="font-size: 0.85rem; color: #999; margin-top: 4px;">Komisi 5%</div>
-                </div>
-            </div>
 
 <!-- ✅ PROFIL TOKO DINAMIS (Diambil dari Database) -->
 <div id="storeProfileContent" style="display: none;">
@@ -3664,14 +3529,14 @@ function omSubmit() {
 
     <!-- Gambar produk -->
     <div style="position:relative; height:220px; flex-shrink:0; overflow:hidden; border-radius:20px 20px 0 0;">
-      <img id="dmImg" src="" alt="" style="width:100%; height:100%; object-fit:cover;">
+      
       <div style="position:absolute; inset:0; background:linear-gradient(to top, rgba(0,0,0,0.4), transparent);"></div>
       <button onclick="closeDetailModal()" style="position:absolute; top:14px; right:14px; width:34px; height:34px; border-radius:50%; border:none; background:rgba(255,255,255,0.9); font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center;">×</button>
     </div>
 
     <!-- Info produk -->
     <div style="padding:18px 20px; flex:1; overflow-y:auto;">
-      <h3 id="dmName" style="margin:0 0 6px; font-size:18px; font-weight:700; color:#1a1a1a;"></h3>
+      
       <p id="dmDesc" style="margin:0 0 14px; font-size:13px; color:#888; line-height:1.6;"></p>
       <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 0; border-top:1px solid #f0f0f0;">
         <span style="font-size:13px; color:#888;">Harga</span>
