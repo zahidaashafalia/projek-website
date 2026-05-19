@@ -1,92 +1,26 @@
 <?php
-// Hapus atau comment session_start() jika sudah ada di config.php
-// session_start(); 
 include 'config.php';
-
 
 // Ambil data pesanan dari database
 $orders = [];
 if(isset($_SESSION['user_phone'])){
     $phone = $_SESSION['user_phone'];
+    // Pastikan kolom payment_method ada di tabel orders
     $result = mysqli_query($conn, "SELECT * FROM orders WHERE customer_phone = '$phone' ORDER BY id DESC");
     while($row = mysqli_fetch_assoc($result)){
-        // Ambil items - coba dari kolom items (JSON) atau tabel order_items
         $items = [];
         
-        // Coba ambil dari kolom items (JSON format)
-        if(isset($row['items']) && !empty($row['items']) && $row['items'] !== 'NULL'){
-            $decoded = json_decode($row['items'], true);
-            if(is_array($decoded)){
-                $items = $decoded;
-            }
-        }
-        
-        // Jika masih kosong, coba ambil dari tabel order_items
-        if(empty($items)){
-            $itemsResult = mysqli_query($conn, "SELECT * FROM order_items WHERE order_id = {$row['id']}");
-            if($itemsResult){
-                while($item = mysqli_fetch_assoc($itemsResult)){
-                    $items[] = $item;
-                }
+        // Coba ambil dari tabel order_items (Lebih stabil daripada JSON)
+        $itemsResult = mysqli_query($conn, "SELECT * FROM order_items WHERE order_id = {$row['id']}");
+        if($itemsResult){
+            while($item = mysqli_fetch_assoc($itemsResult)){
+                $items[] = $item;
             }
         }
         
         $row['items'] = $items;
         $orders[] = $row;
     }
-}
-
-// Debug: Lihat isi orders
-// echo "<pre>"; print_r($orders); echo "</pre>"; exit;
-
-// Demo data jika belum ada pesanan
-if(empty($orders)){
-    $orders = [
-        [
-            'id' => 1001,
-            'store_name' => 'Texcer Hot',
-            'status' => 'Selesai',
-            'created_at' => '2025-05-10 11:51:00',
-            'total_price' => 37000,
-            'resi_number' => 'JNE123456',
-            'items' => [
-                [
-                    'id' => 1,
-                    'name' => 'Mie Yamin', 
-                    'variant' => '', 
-                    'price' => 9000, 
-                    'qty' => 2, 
-                    'image' => 'assets/images/mie/yamin.png'
-                ],
-                [
-                    'id' => 3,
-                    'name' => 'Ceker Mercon Tanpa Tulang', 
-                    'variant' => 'Medium (5 pcs)', 
-                    'price' => 15000, 
-                    'qty' => 1, 
-                    'image' => 'assets/images/mercon/ceker_tnpa_tulang.jpg'
-                ],
-            ]
-        ],
-        [
-            'id' => 1002,
-            'store_name' => 'Texcer Hot',
-            'status' => 'Menunggu Konfirmasi',
-            'created_at' => '2025-05-12 18:57:00',
-            'total_price' => 3000,
-            'resi_number' => '',
-            'items' => [
-                [
-                    'id' => 11,
-                    'name' => 'Teh', 
-                    'variant' => 'Es', 
-                    'price' => 3000, 
-                    'qty' => 1, 
-                    'image' => 'assets/images/minuman/teh.jpg'
-                ],
-            ]
-        ],
-    ];
 }
 
 $currentPage = 'riwayat.php';
@@ -252,34 +186,20 @@ body { background: #f5f5f5; color: var(--text-dark); font-family: 'Segoe UI', sy
     padding: 14px 0 40px;
 }
 
-/* Bonus Banner */
-.bonus-banner {
-    background: #FFF8EE;
-    padding: 11px 18px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 10px;
-}
-.bonus-badge {
-    background: #FF9800;
-    color: white;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-weight: 800;
-}
-
 /* Order Card */
 .order-card {
     background: var(--bg-white);
     margin-bottom: 10px;
     border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
 }
 .order-header {
     padding: 14px 18px;
     display: flex;
     justify-content: space-between;
     border-bottom: 1px solid var(--border);
+    background: #fafafa;
 }
 .store-name {
     font-weight: 700;
@@ -327,12 +247,14 @@ body { background: #f5f5f5; color: var(--text-dark); font-family: 'Segoe UI', sy
     gap: 12px;
     border-bottom: 1px solid var(--border);
 }
+.product-row:last-child { border-bottom: none; }
 .product-thumb {
     width: 70px;
     height: 70px;
     border-radius: 8px;
     object-fit: cover;
     border: 1px solid var(--border);
+    background: #eee;
 }
 .product-thumb-placeholder {
     width: 70px;
@@ -349,6 +271,7 @@ body { background: #f5f5f5; color: var(--text-dark); font-family: 'Segoe UI', sy
 .product-name {
     font-weight: 500;
     margin-bottom: 4px;
+    font-size: 0.95rem;
 }
 .product-variant {
     font-size: 0.78rem;
@@ -359,16 +282,20 @@ body { background: #f5f5f5; color: var(--text-dark); font-family: 'Segoe UI', sy
     display: flex;
     justify-content: space-between;
     font-size: 0.88rem;
+    color: var(--text-dark);
 }
 
 /* Footer */
 .order-footer {
     padding: 12px 18px;
+    background: #fdfdfd;
 }
 .order-total {
     text-align: right;
     margin-bottom: 12px;
     font-weight: 700;
+    font-size: 1.1rem;
+    color: var(--primary);
 }
 .action-buttons {
     display: flex;
@@ -383,14 +310,14 @@ body { background: #f5f5f5; color: var(--text-dark); font-family: 'Segoe UI', sy
     border-radius: 20px;
     font-weight: 700;
     cursor: pointer;
+    transition: all 0.2s;
 }
-.btn-cart-small {
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
-    border: 1px solid var(--border);
-    background: white;
-    cursor: pointer;
+.btn-buy-again:hover {
+    background: var(--primary-dark);
+}
+.btn-buy-again:disabled {
+    background: #ccc;
+    cursor: not-allowed;
 }
 
 /* Empty State */
@@ -462,14 +389,7 @@ body { background: #f5f5f5; color: var(--text-dark); font-family: 'Segoe UI', sy
 <!-- Main Content -->
 <div class="main-content">
 
-    <!-- Bonus Banner -->
-    <div class="bonus-banner">
-        <div>
-            <i class="fas fa-gift" style="color:#FF9800;"></i>
-            <span>Dapatkan <span class="bonus-badge">bonus 35</span> dengan menulis ulasan.</span>
-        </div>
-        <i class="fas fa-chevron-right"></i>
-    </div>
+    <!-- ✅ BONUS BANNER DIHAPUS SESUAI PERMINTAAN -->
 
     <?php if(empty($filteredOrders)): ?>
     <div class="empty-state">
@@ -487,8 +407,29 @@ body { background: #f5f5f5; color: var(--text-dark); font-family: 'Segoe UI', sy
         $storeName = $order['store_name'] ?? $order['store'] ?? 'Texcer Hot';
         $items = $order['items'] ?? [];
         $status = $order['status'] ?? '';
+        
+        // ✅ Ambil Metode Pembayaran
+        $paymentMethod = $order['payment_method'] ?? 'COD'; 
+        
         $isSelesai = $status === 'Selesai';
         $isMenunggu = in_array($status, ['Menunggu Konfirmasi', 'Pending']);
+        
+        // Tentukan Label & Action Tombol
+        $btnText = 'Beli lagi';
+        $btnAction = 'window.location.href=\'index.php\'';
+        $showPayButton = false;
+
+        if ($isMenunggu) {
+            if ($paymentMethod === 'COD') {
+                $btnText = 'Menunggu Konfirmasi'; 
+                $btnAction = 'void(0)';
+                $showPayButton = false; 
+            } else {
+                $btnText = 'Bayar Sekarang';
+                $btnAction = "window.location.href='checkout.php?pay_order={$order['id']}'";
+                $showPayButton = true;
+            }
+        }
     ?>
     <div class="order-card">
 
@@ -520,30 +461,29 @@ body { background: #f5f5f5; color: var(--text-dark); font-family: 'Segoe UI', sy
         <!-- Products -->
         <?php if(is_array($items) && !empty($items)): ?>
             <?php foreach($items as $item): 
-                // Pastikan data item ada
                 $itemName = $item['name'] ?? ($item['product_name'] ?? 'Produk');
                 $itemVariant = $item['variant'] ?? '';
                 $itemPrice = $item['price'] ?? 0;
                 $itemQty = $item['qty'] ?? ($item['quantity'] ?? 1);
                 $itemImage = $item['image'] ?? ($item['product_image'] ?? '');
                 
-                // Perbaiki path gambar
+                // ✅ PERBAIKAN PATH GAMBAR AGAR MUNCUL
                 $imagePath = '';
                 if(!empty($itemImage)){
-                    // Cek apakah path sudah benar
-                    if(file_exists($itemImage)){
+                    if(filter_var($itemImage, FILTER_VALIDATE_URL)){
                         $imagePath = $itemImage;
-                    } elseif(file_exists('texcer2/' . $itemImage)){
-                        $imagePath = 'texcer2/' . $itemImage;
-                    } else {
-                        // Gunakan placeholder jika file tidak ada
-                        $imagePath = '';
-                    }
+                    } elseif(file_exists($itemImage)){
+                        $imagePath = $itemImage;
+                    } elseif(file_exists('uploads/' . $itemImage)){
+                        $imagePath = 'uploads/' . $itemImage;
+                    } elseif(file_exists('texcer2/uploads/' . $itemImage)){
+                        $imagePath = 'texcer2/uploads/' . $itemImage;
+                    } 
                 }
             ?>
             <div class="product-row">
                 <?php if(!empty($imagePath)): ?>
-                <img src="<?= $imagePath ?>" alt="<?= htmlspecialchars($itemName) ?>" class="product-thumb">
+                <img src="<?= htmlspecialchars($imagePath) ?>" alt="<?= htmlspecialchars($itemName) ?>" class="product-thumb" onerror="this.src='assets/images/placeholder.png'">
                 <?php else: ?>
                 <div class="product-thumb-placeholder">
                     <i class="fas fa-utensils"></i>
@@ -564,7 +504,6 @@ body { background: #f5f5f5; color: var(--text-dark); font-family: 'Segoe UI', sy
             <?php endforeach; ?>
         <?php else: ?>
         <div style="padding:20px; text-align:center; color:var(--text-gray);">
-            <i class="fas fa-box-open" style="font-size:2rem; margin-bottom:10px; opacity:0.5;"></i>
             <p>Detail produk tidak tersedia</p>
         </div>
         <?php endif; ?>
@@ -573,44 +512,30 @@ body { background: #f5f5f5; color: var(--text-dark); font-family: 'Segoe UI', sy
         <div class="order-footer">
             <div class="order-total">
                 Total: Rp<?= number_format($order['total_price'] ?? 0, 0, ',', '.') ?>
+                <?php if($paymentMethod === 'COD'): ?>
+                <span style="font-size:0.8rem; color:#666; font-weight:normal; margin-left:8px;">(COD)</span>
+                <?php endif; ?>
             </div>
             <div class="action-buttons">
     
- <!-- ✅ TOMBOL REVIEW BARU - 1 Tombol dengan Modal -->
-<?php if($isSelesai && !empty($items)): ?>
-    <?php 
-    // Ambil item pertama untuk tombol review (1 tombol per order)
-    $firstItem = $items[0];
-    $itemId = $firstItem['id'] ?? $firstItem['product_id'] ?? 0;
-    $itemName = $firstItem['name'] ?? $firstItem['product_name'] ?? 'Produk';
-    
-    // Cek apakah sudah direview
-    $alreadyReviewed = false;
-    if(function_exists('isProductReviewed')){
-        $alreadyReviewed = isProductReviewed($conn, $order['id'], $itemId);
-    }
-    ?>
-    
-    <?php if(!$alreadyReviewed): ?>
-    <button class="btn btn-sm btn-review" 
-            style="background: #FFB800; color: white; border: none; border-radius: 20px; padding: 6px 16px; font-weight: 600;"
-            onclick="openReviewModal(<?= $order['id'] ?>, <?= $itemId ?>, '<?= addslashes($itemName) ?>')">
-        <i class="fas fa-star me-1"></i>Ulas
-    </button>
-    <?php else: ?>
-    <span class="badge" style="background: #4CAF50; color: white; border-radius: 20px; padding: 6px 12px; font-size: 0.8rem;">
-        <i class="fas fa-check me-1"></i>Terulas
-    </span>
-    <?php endif; ?>
-<?php endif; ?>
-    
-    <button class="btn-cart-small" onclick="alert('Tambah ke keranjang')">
-        <i class="fas fa-cart-plus"></i>
-    </button>
-    <button class="btn-buy-again" onclick="alert('Beli lagi')">
-        <?= $isMenunggu ? 'Bayar Sekarang' : 'Beli lagi' ?>
-    </button>
-</div>
+                <!-- ✅ TOMBOL REVIEW & KERANJANG DIHAPUS SESUAI PERMINTAAN -->
+                
+                <!-- ✅ LOGIKA TOMBOL UTAMA (COD vs NON-COD) -->
+                <?php if($showPayButton): ?>
+                <button class="btn-buy-again" onclick="<?= $btnAction ?>">
+                    <?= $btnText ?>
+                </button>
+                <?php elseif($isMenunggu && $paymentMethod === 'COD'): ?>
+                <button class="btn-buy-again" disabled>
+                    Menunggu Konfirmasi
+                </button>
+                <?php else: ?>
+                <button class="btn-buy-again" onclick="<?= $btnAction ?>">
+                    <?= $btnText ?>
+                </button>
+                <?php endif; ?>
+
+            </div>
         </div>
 
     </div>
@@ -620,103 +545,7 @@ body { background: #f5f5f5; color: var(--text-dark); font-family: 'Segoe UI', sy
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<!-- ✅ MODAL REVIEW - Tambah sebelum </body> -->
-<div class="modal fade" id="reviewModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <form id="reviewForm" method="POST" action="submit_review.php" enctype="multipart/form-data">
-                <div class="modal-header">
-                    <h5 class="modal-title">✨ Beri Ulasan</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <input type="hidden" name="order_id" id="r_order_id">
-                    <input type="hidden" name="product_id" id="r_product_id">
-                    
-                    <div class="mb-3">
-                        <label class="form-label small text-muted">Produk</label>
-                        <input type="text" class="form-control" id="r_product_name" readonly style="background: #f8f9fa;">
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label small text-muted">Rating</label>
-                        <div class="d-flex gap-1" id="starRating">
-                            <?php for($i = 5; $i >= 1; $i--): ?>
-                            <label style="cursor: pointer; font-size: 1.8rem;">
-                                <input type="radio" name="rating" value="<?= $i ?>" class="d-none" id="star<?= $i ?>">
-                                <span class="star" data-value="<?= $i ?>">☆</span>
-                            </label>
-                            <?php endfor; ?>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label small text-muted">Ulasan</label>
-                        <textarea name="review_text" class="form-control" rows="3" placeholder="Ceritakan pengalamanmu..." required></textarea>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label small text-muted">Foto (Opsional)</label>
-                        <input type="file" name="review_image" class="form-control" accept="image/*" id="r_image">
-                        <small class="text-muted" style="font-size: 0.75rem;">JPG/PNG, maks 2MB</small>
-                        <img id="imgPreview" class="mt-2 rounded" style="max-width: 150px; display: none;">
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn" style="background: #FFB800; color: white; font-weight: 600;">
-                        <i class="fas fa-paper-plane me-1"></i>Kirim Ulasan
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
+<!-- ✅ MODAL REVIEW & SCRIPT JS REVIEW DIHAPUS TOTAL -->
 
-<style>
-#starRating .star { transition: transform 0.1s; color: #ccc; }
-#starRating .star:hover,
-#starRating .star.active { color: #FFB800; transform: scale(1.2); }
-#starRating input:checked ~ .star,
-#starRating .star.selected { color: #FFB800; }
-</style>
-
-<script>
-function openReviewModal(orderId, productId, productName) {
-    document.getElementById('r_order_id').value = orderId;
-    document.getElementById('r_product_id').value = productId;
-    document.getElementById('r_product_name').value = productName;
-    const modal = new bootstrap.Modal(document.getElementById('reviewModal'));
-    modal.show();
-}
-
-// Rating bintang interaktif
-document.querySelectorAll('#starRating .star').forEach(star => {
-    star.addEventListener('click', function() {
-        const value = this.dataset.value;
-        document.querySelectorAll('#starRating .star').forEach(s => {
-            s.classList.toggle('selected', s.dataset.value <= value);
-        });
-        document.querySelector(`#starRating input[value="${value}"]`).checked = true;
-    });
-});
-
-// Preview gambar
-document.getElementById('r_image').addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    if(file && file.size <= 2 * 1024 * 1024) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const preview = document.getElementById('imgPreview');
-            preview.src = e.target.result;
-            preview.style.display = 'block';
-        };
-        reader.readAsDataURL(file);
-    } else if(file) {
-        alert('❌ File terlalu besar! Maksimal 2MB');
-        this.value = '';
-    }
-});
-</script>
 </body>
 </html>

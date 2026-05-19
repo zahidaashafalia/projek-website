@@ -12,6 +12,9 @@ if(!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin'){
 if(isset($_GET['delete'])){
     $id = (int)$_GET['delete'];
     mysqli_query($conn, "DELETE FROM orders WHERE id=$id");
+    // Hapus juga item terkait agar tidak ada data sampah (opsional tapi disarankan)
+    mysqli_query($conn, "DELETE FROM order_items WHERE order_id=$id");
+    
     $_SESSION['success'] = "Pesanan berhasil dihapus";
     header("Location: orders.php");
     exit;
@@ -65,6 +68,7 @@ $orders = mysqli_query($conn, "SELECT * FROM orders WHERE $whereSQL ORDER BY cre
             position: fixed;
             left: 0;
             border-right: 1px solid var(--border);
+            z-index: 1000;
         }
         .sidebar-logo {
             font-size: 1.5rem;
@@ -76,7 +80,7 @@ $orders = mysqli_query($conn, "SELECT * FROM orders WHERE $whereSQL ORDER BY cre
             align-items: center;
             gap: 10px;
         }
-        .sidebar-menu { list-style: none; }
+        .sidebar-menu { list-style: none; padding-left: 0; }
         .sidebar-menu li { margin-bottom: 4px; }
         .sidebar-menu a {
             display: flex;
@@ -121,6 +125,26 @@ $orders = mysqli_query($conn, "SELECT * FROM orders WHERE $whereSQL ORDER BY cre
         .status-completed { background: #D1FAE5; color: #065F46; }
         .status-cancelled { background: #FEE2E2; color: #B91C1C; }
         
+        /* Modal Detail Styles */
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px dashed #eee;
+        }
+        .detail-row:last-child { border-bottom: none; }
+        .detail-label { color: #666; font-size: 0.9rem; }
+        .detail-value { font-weight: 600; color: #333; text-align: right; }
+        
+        .item-thumb {
+            width: 50px;
+            height: 50px;
+            object-fit: cover;
+            border-radius: 8px;
+            margin-right: 12px;
+            border: 1px solid #eee;
+        }
+        
         @media (max-width: 768px) {
             .sidebar { display: none; }
             .main-content { margin-left: 0; }
@@ -136,20 +160,15 @@ $orders = mysqli_query($conn, "SELECT * FROM orders WHERE $whereSQL ORDER BY cre
         <span>Texcer Hot</span>
     </div>
     <ul class="sidebar-menu">
-    <li><a href="dashboard.php"><i class="fas fa-home"></i><span>Dashboard</span></a></li>
-    <li><a href="orders.php"><i class="fas fa-shopping-bag"></i><span>Pesanan</span></a></li>
-    <li><a href="products.php"><i class="fas fa-utensils"></i><span>Produk</span></a></li>
-    <li><a href="categories.php"><i class="fas fa-tags"></i><span>Kategori</span></a></li>
-    <li><a href="customers.php" class="<?= ($currentPage ?? '') == 'customers.php' ? 'active' : '' ?>"><i class="fas fa-users"></i><span>Pelanggan</span></a></li>
-    
-    <!-- ✅ MENU BARU: Kelola Gambar -->
-    <li><a href="manage-images.php" class="<?= ($currentPage ?? '') == 'manage-images.php' ? 'active' : '' ?>"><i class="fas fa-images"></i><span>Kelola Gambar</span></a></li>
-    <li><a href="admin_topping.php" class="<?= ($currentPage ?? '') == 'admin_topping.php' ? 'active' : '' ?>">
-    <i class="fas fa-pepper-hot"></i><span>Topping & Level</span>
-</a></li>
-
-    <li><a href="settings.php"><i class="fas fa-cog"></i><span>Pengaturan</span></a></li>
-</ul>
+        <li><a href="dashboard.php"><i class="fas fa-home"></i><span>Dashboard</span></a></li>
+        <li><a href="orders.php" class="active"><i class="fas fa-shopping-bag"></i><span>Pesanan</span></a></li>
+        <li><a href="products.php"><i class="fas fa-utensils"></i><span>Produk</span></a></li>
+        <li><a href="categories.php"><i class="fas fa-tags"></i><span>Kategori</span></a></li>
+        <li><a href="customers.php"><i class="fas fa-users"></i><span>Pelanggan</span></a></li>
+        <li><a href="manage-images.php"><i class="fas fa-images"></i><span>Kelola Gambar</span></a></li>
+        <li><a href="admin_topping.php"><i class="fas fa-pepper-hot"></i><span>Topping & Level</span></a></li>
+        <li><a href="settings.php"><i class="fas fa-cog"></i><span>Pengaturan</span></a></li>
+    </ul>
 </aside>
 
 <!-- Main Content -->
@@ -210,8 +229,8 @@ $orders = mysqli_query($conn, "SELECT * FROM orders WHERE $whereSQL ORDER BY cre
     <div class="card">
         <div class="card-body">
             <div style="overflow-x: auto;">
-                <table class="table table-hover">
-                    <thead>
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
                         <tr>
                             <th>ID</th>
                             <th>Pelanggan</th>
@@ -243,10 +262,15 @@ $orders = mysqli_query($conn, "SELECT * FROM orders WHERE $whereSQL ORDER BY cre
                                 </td>
                                 <td>
                                     <?php
-                                    // Get order items
-                                    $items = mysqli_query($conn, "SELECT oi.*, oi.product_name as name FROM order_items oi WHERE oi.order_id = {$order['id']}");
-                                    while($item = mysqli_fetch_assoc($items)){
-                                        echo "<div>" . htmlspecialchars($item['product_name'] ?? 'Produk') . " (x{$item['qty']})</div>";
+                                    // Get order items preview (max 2 items)
+                                    $itemsPreview = mysqli_query($conn, "SELECT product_name, qty FROM order_items WHERE order_id = {$order['id']} LIMIT 2");
+                                    $countItems = mysqli_num_rows(mysqli_query($conn, "SELECT COUNT(*) as total FROM order_items WHERE order_id = {$order['id']}"));
+                                    
+                                    while($item = mysqli_fetch_assoc($itemsPreview)){
+                                        echo "<div class='text-truncate' style='max-width: 200px;'>" . htmlspecialchars($item['product_name']) . " (x{$item['qty']})</div>";
+                                    }
+                                    if($countItems > 2) {
+                                        echo "<small class='text-muted'>+ " . ($countItems - 2) . " item lainnya...</small>";
                                     }
                                     ?>
                                 </td>
@@ -255,15 +279,18 @@ $orders = mysqli_query($conn, "SELECT * FROM orders WHERE $whereSQL ORDER BY cre
                                 <td><?= htmlspecialchars($order['resi_number'] ?? '-') ?></td>
                                 <td><?= date('d/m/Y H:i', strtotime($order['created_at'] ?? 'now')) ?></td>
                                 <td>
-                                    <button class="btn btn-sm btn-info text-white" onclick="viewOrder(<?= $order['id'] ?>)">
+                                    <!-- Tombol Mata: View Detail -->
+                                    <button class="btn btn-sm btn-info text-white" onclick="viewOrderDetail(<?= $order['id'] ?>)" title="Lihat Detail">
                                         <i class="fas fa-eye"></i>
                                     </button>
+                                    
                                     <?php if(!in_array($order['status'], ['Selesai', 'Dibatalkan'])): ?>
-                                    <button class="btn btn-sm btn-warning" onclick="updateStatus(<?= $order['id'] ?>)">
+                                    <button class="btn btn-sm btn-warning" onclick="updateStatus(<?= $order['id'] ?>)" title="Update Status">
                                         <i class="fas fa-edit"></i>
                                     </button>
                                     <?php endif; ?>
-                                    <a href="?delete=<?= $order['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Hapus pesanan ini?')">
+                                    
+                                    <a href="?delete=<?= $order['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Yakin ingin menghapus pesanan ini? Data akan hilang permanen.')" title="Hapus">
                                         <i class="fas fa-trash"></i>
                                     </a>
                                 </td>
@@ -284,7 +311,9 @@ $orders = mysqli_query($conn, "SELECT * FROM orders WHERE $whereSQL ORDER BY cre
     </div>
 </main>
 
-<!-- Modal Update Status (sama seperti di dashboard) -->
+<!-- ==========================================
+     MODAL UPDATE STATUS
+     ========================================== -->
 <div class="modal fade" id="modalUpdateStatus" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -325,12 +354,36 @@ $orders = mysqli_query($conn, "SELECT * FROM orders WHERE $whereSQL ORDER BY cre
     </div>
 </div>
 
+<!-- ==========================================
+     MODAL VIEW ORDER DETAIL (BARU)
+     ========================================== -->
+<div class="modal fade" id="modalViewOrder" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title"><i class="fas fa-receipt me-2"></i>Detail Pesanan <span id="viewOrderId">#0000</span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="viewOrderBody">
+                <!-- Konten akan diisi oleh JavaScript -->
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Memuat detail pesanan...</p>
+                </div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+                <button type="button" class="btn btn-primary" onclick="window.print()"><i class="fas fa-print me-2"></i>Cetak</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-function viewOrder(id) {
-    alert('Detail pesanan #' + id + '\n\nFitur detail lengkap akan segera hadir!');
-}
-
+// Fungsi Update Status
 function updateStatus(id) {
     document.getElementById('update_order_id').value = id;
     document.getElementById('update_order_id_display').value = '#' + String(id).padStart(4, '0');
@@ -345,6 +398,117 @@ document.querySelector('select[name="new_status"]')?.addEventListener('change', 
     document.getElementById('resi_field').style.display = 
         e.target.value === 'Dikirim' ? 'block' : 'none';
 });
+
+// ============================================================
+// FUNGSI VIEW ORDER DETAIL (AJAX)
+// ============================================================
+function viewOrderDetail(id) {
+    const modal = new bootstrap.Modal(document.getElementById('modalViewOrder'));
+    modal.show();
+    
+    document.getElementById('viewOrderId').textContent = '#' + String(id).padStart(4, '0');
+    document.getElementById('viewOrderBody').innerHTML = `
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-2">Memuat detail...</p>
+        </div>
+    `;
+
+    // Fetch data dari server
+    fetch('api/get_order_detail.php?id=' + id)
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success) {
+            document.getElementById('viewOrderBody').innerHTML = `<div class="alert alert-danger">Gagal memuat data: ${data.message}</div>`;
+            return;
+        }
+
+        const order = data.order;
+        const items = data.items;
+
+        let itemsHtml = '';
+        items.forEach(item => {
+            // Fallback image jika kosong
+            const imgUrl = item.image ? item.image : 'assets/images/placeholder.png';
+            
+            itemsHtml += `
+            <div class="d-flex align-items-start mb-3 pb-3 border-bottom">
+                <img src="${imgUrl}" alt="${item.product_name}" class="item-thumb" onerror="this.src='assets/images/placeholder.png'">
+                <div class="flex-grow-1">
+                    <h6 class="mb-1">${item.product_name}</h6>
+                    ${item.variant ? `<small class="text-muted d-block mb-1"><i class="fas fa-tag me-1"></i>${item.variant}</small>` : ''}
+                    <div class="d-flex justify-content-between mt-2">
+                        <span class="text-muted small">Rp ${Number(item.price).toLocaleString('id-ID')} x ${item.qty}</span>
+                        <span class="fw-bold">Rp ${(item.price * item.qty).toLocaleString('id-ID')}</span>
+                    </div>
+                </div>
+            </div>
+            `;
+        });
+
+        const statusColor = {
+            'Menunggu Konfirmasi': 'warning',
+            'Pending': 'warning',
+            'Diproses': 'info',
+            'Dikemas': 'primary',
+            'Dikirim': 'success',
+            'Selesai': 'success',
+            'Dibatalkan': 'danger'
+        }[order.status] || 'secondary';
+
+        const html = `
+            <div class="row">
+                <!-- Kolom Kiri: Info Pelanggan & Pembayaran -->
+                <div class="col-md-6 mb-4">
+                    <div class="card h-100 border-0 bg-light">
+                        <div class="card-body">
+                            <h6 class="card-title mb-3 text-uppercase text-muted small fw-bold">Info Pelanggan</h6>
+                            <div class="detail-row"><span class="detail-label">Nama</span><span class="detail-value">${order.customer_name}</span></div>
+                            <div class="detail-row"><span class="detail-label">No. HP</span><span class="detail-value">${order.customer_phone}</span></div>
+                            <div class="detail-row"><span class="detail-label">Alamat</span><span class="detail-value text-end">${order.customer_address}, ${order.customer_city}, ${order.customer_province}</span></div>
+                            
+                            <h6 class="card-title mb-3 mt-4 text-uppercase text-muted small fw-bold">Pembayaran</h6>
+                            <div class="detail-row"><span class="detail-label">Metode</span><span class="detail-value">${order.payment_method || 'COD'}</span></div>
+                            <div class="detail-row"><span class="detail-label">Catatan</span><span class="detail-value text-end">${order.notes || '-'}</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Kolom Kanan: Status & Ringkasan -->
+                <div class="col-md-6 mb-4">
+                    <div class="card h-100 border-0 bg-light">
+                        <div class="card-body">
+                            <h6 class="card-title mb-3 text-uppercase text-muted small fw-bold">Status Pesanan</h6>
+                            <div class="d-flex align-items-center mb-3">
+                                <span class="badge bg-${statusColor} fs-6 me-2">${order.status}</span>
+                                <small class="text-muted">${new Date(order.created_at).toLocaleString('id-ID')}</small>
+                            </div>
+                            ${order.resi_number ? `<div class="alert alert-info py-2 mb-0"><i class="fas fa-truck me-2"></i>Resi: <strong>${order.resi_number}</strong></div>` : ''}
+
+                            <h6 class="card-title mb-3 mt-4 text-uppercase text-muted small fw-bold">Ringkasan Biaya</h6>
+                            <div class="detail-row"><span class="detail-label">Subtotal Produk</span><span class="detail-value">Rp ${Number(order.total_price).toLocaleString('id-ID')}</span></div>
+                            <div class="detail-row"><span class="detail-label">Ongkir</span><span class="detail-value text-success">Gratis</span></div>
+                            <div class="detail-row border-top pt-2 mt-2"><span class="detail-label fw-bold">Total Bayar</span><span class="detail-value fw-bold fs-5 text-primary">Rp ${Number(order.total_price).toLocaleString('id-ID')}</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <h6 class="text-uppercase text-muted small fw-bold mb-3">Item Pesanan (${items.length})</h6>
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-3">
+                    ${itemsHtml}
+                </div>
+            </div>
+        `;
+
+        document.getElementById('viewOrderBody').innerHTML = html;
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        document.getElementById('viewOrderBody').innerHTML = `<div class="alert alert-danger">Terjadi kesalahan jaringan.</div>`;
+    });
+}
 </script>
 </body>
 </html>
