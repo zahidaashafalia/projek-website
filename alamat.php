@@ -1,64 +1,122 @@
 <?php 
+session_start(); // Pastikan session dimulai
 include 'config.php'; 
 
-// Set phone session jika belum ada
-if(!isset($_SESSION['user_phone']) && !empty($_GET['phone'])){
+// ==========================================
+// LOGIKA PENANGANAN NOMOR HP & SESSION
+// ==========================================
+
+// 1. Jika ada input phone dari GET (klik Lanjutkan), simpan ke Session
+if(isset($_GET['phone']) && !empty($_GET['phone'])){
     $_SESSION['user_phone'] = $_GET['phone'];
+    // Redirect ke halaman sendiri tanpa parameter GET agar URL bersih
+    header("Location: alamat.php");
+    exit;
 }
 
-$phone = $_SESSION['user_phone'] ?? '';
+// 2. Ambil nomor HP dari Session
+$phone = isset($_SESSION['user_phone']) ? $_SESSION['user_phone'] : '';
 
-// --- LOGIKA CRUD ---
+// ==========================================
+// LOGIKA CRUD ALAMAT (POST & GET Actions)
+// ==========================================
+
+// Simpan / Update Alamat
 if(isset($_POST['save_address'])){
+    if(empty($phone)) {
+        echo "<script>alert('Sesi berakhir. Silakan masukkan nomor HP lagi.'); window.location='alamat.php';</script>";
+        exit;
+    }
+
     $name = mysqli_real_escape_string($conn, $_POST['name']);
-    $phone_in = mysqli_real_escape_string($conn, $_POST['phone']);
+    // Gunakan nomor HP dari session, bukan dari input form untuk keamanan konsistensi data
+    $phone_in = $phone; 
     $address = mysqli_real_escape_string($conn, $_POST['address']);
     $city = mysqli_real_escape_string($conn, $_POST['city']);
     $province = mysqli_real_escape_string($conn, $_POST['province']);
     $is_default = isset($_POST['is_default']) ? 1 : 0;
     
-    if(empty($phone)){
-        $_SESSION['user_phone'] = $phone_in;
-        $phone = $phone_in;
-    }
-    
+    // Jika dijadikan default, reset alamat lain user ini menjadi non-default
     if($is_default){
-        mysqli_query($conn, "UPDATE addresses SET is_default = 0 WHERE customer_phone = '$phone'");
+        mysqli_query($conn, "UPDATE addresses SET is_default = 0 WHERE customer_phone = '$phone_in'");
     }
     
     if(isset($_POST['edit_id']) && !empty($_POST['edit_id'])){
-        $id = $_POST['edit_id'];
-        mysqli_query($conn, "UPDATE addresses SET customer_name='$name', full_address='$address', city='$city', province='$province', is_default='$is_default' WHERE id='$id' AND customer_phone='$phone'");
+        $id = (int)$_POST['edit_id'];
+        // Update data
+        $sql = "UPDATE addresses SET 
+                customer_name='$name', 
+                full_address='$address', 
+                city='$city', 
+                province='$province', 
+                is_default='$is_default' 
+                WHERE id='$id' AND customer_phone='$phone_in'";
+        
+        if(mysqli_query($conn, $sql)){
+            header("Location: alamat.php");
+            exit;
+        } else {
+            echo "<script>alert('Gagal update: " . mysqli_error($conn) . "');</script>";
+        }
     } else {
-        mysqli_query($conn, "INSERT INTO addresses (customer_name, customer_phone, full_address, city, province, is_default) VALUES ('$name', '$phone', '$address', '$city', '$province', '$is_default')");
+        // Insert data baru
+        $sql = "INSERT INTO addresses (customer_name, customer_phone, full_address, city, province, is_default) 
+                VALUES ('$name', '$phone_in', '$address', '$city', '$province', '$is_default')";
+        
+        if(mysqli_query($conn, $sql)){
+            header("Location: alamat.php");
+            exit;
+        } else {
+            echo "<script>alert('Gagal simpan: " . mysqli_error($conn) . "');</script>";
+        }
     }
-    header("Location: alamat.php");
-    exit;
 }
 
+// Hapus Alamat
 if(isset($_GET['delete'])){
-    $id = $_GET['delete'];
+    if(empty($phone)) { header("Location: alamat.php"); exit; }
+    
+    $id = (int)$_GET['delete'];
     mysqli_query($conn, "DELETE FROM addresses WHERE id='$id' AND customer_phone='$phone'");
     header("Location: alamat.php");
     exit;
 }
 
+// Set Default
 if(isset($_GET['set_default'])){
-    $id = $_GET['set_default'];
+    if(empty($phone)) { header("Location: alamat.php"); exit; }
+    
+    $id = (int)$_GET['set_default'];
     mysqli_query($conn, "UPDATE addresses SET is_default = 0 WHERE customer_phone = '$phone'");
     mysqli_query($conn, "UPDATE addresses SET is_default = 1 WHERE id='$id' AND customer_phone='$phone'");
     header("Location: alamat.php");
     exit;
 }
 
-// Ambil data alamat
-$addresses = mysqli_query($conn, "SELECT * FROM addresses WHERE customer_phone = '$phone' ORDER BY is_default DESC, id DESC");
+// ==========================================
+// PENGAMBILAN DATA UNTUK TAMPILAN
+// ==========================================
 
-// Cek jika sedang edit
+$addresses = [];
 $edit_data = null;
-if(isset($_GET['edit'])){
-    $edit_id = $_GET['edit'];
-    $edit_data = mysqli_fetch_assoc(mysqli_query($conn, "SELECT * FROM addresses WHERE id='$edit_id' AND customer_phone='$phone'"));
+
+if(!empty($phone)){
+    // Ambil daftar alamat
+    $res_addresses = mysqli_query($conn, "SELECT * FROM addresses WHERE customer_phone = '$phone' ORDER BY is_default DESC, id DESC");
+    if($res_addresses) {
+        while($row = mysqli_fetch_assoc($res_addresses)) {
+            $addresses[] = $row;
+        }
+    }
+
+    // Cek jika mode Edit
+    if(isset($_GET['edit'])){
+        $edit_id = (int)$_GET['edit'];
+        $res_edit = mysqli_query($conn, "SELECT * FROM addresses WHERE id='$edit_id' AND customer_phone='$phone' LIMIT 1");
+        if($res_edit && mysqli_num_rows($res_edit) > 0){
+            $edit_data = mysqli_fetch_assoc($res_edit);
+        }
+    }
 }
 ?>
 
@@ -111,29 +169,32 @@ if(isset($_GET['edit'])){
 </div>
 
 <?php if(empty($phone)): ?>
+    <!-- FORM INPUT NOMOR HP AWAL -->
     <div class="container mt-4">
-        <div class="card p-4">
+        <div class="card p-4 shadow-sm">
             <h5>Masukkan Nomor HP Anda</h5>
-            <p class="text-muted small">Nomor HP akan digunakan untuk menyimpan alamat Anda.</p>
+            <p class="text-muted small mb-3">Nomor HP akan digunakan untuk menyimpan alamat Anda.</p>
             <form method="GET">
-                <input type="tel" name="phone" class="form-control" placeholder="Contoh: 08123456789" required>
+                <input type="tel" name="phone" class="form-control" placeholder="Contoh: 08123456789" required pattern="[0-9]{10,13}" title="Masukkan nomor HP yang valid (10-13 angka)">
                 <button type="submit" class="btn-save mt-2">Lanjutkan</button>
             </form>
         </div>
     </div>
 <?php else: ?>
+    <!-- TOMBOL TAMBAH ALAMAT -->
     <a href="#" class="add-btn" data-bs-toggle="modal" data-bs-target="#addressModal">
         <i class="fas fa-plus-circle"></i>
         <span>Tambah alamat</span>
         <i class="fas fa-chevron-right ms-auto"></i>
     </a>
 
-    <?php if(mysqli_num_rows($addresses) > 0): ?>
-        <?php while($addr = mysqli_fetch_assoc($addresses)): ?>
+    <!-- DAFTAR ALAMAT -->
+    <?php if(count($addresses) > 0): ?>
+        <?php foreach($addresses as $addr): ?>
         <div class="addr-card <?= $addr['is_default'] ? 'default' : '' ?>">
             <div class="action-btns">
                 <a href="?edit=<?= $addr['id'] ?>" class="btn-edit">Edit</a>
-                <a href="?delete=<?= $addr['id'] ?>" class="btn-delete" onclick="return confirm('Hapus alamat ini?')"><i class="fas fa-trash"></i></a>
+                <a href="?delete=<?= $addr['id'] ?>" class="btn-delete" onclick="return confirm('Yakin hapus alamat ini?')"><i class="fas fa-trash"></i></a>
             </div>
             <div class="addr-name">
                 <?= htmlspecialchars($addr['customer_name']) ?>
@@ -143,20 +204,21 @@ if(isset($_GET['edit'])){
             <div class="addr-city"><?= htmlspecialchars($addr['city']) ?>, <?= htmlspecialchars($addr['province']) ?></div>
             
             <?php if($addr['is_default']): ?>
-                <span class="badge-default">Default</span>
+                <span class="badge-default"><i class="fas fa-check-circle"></i> Default</span>
             <?php else: ?>
                 <a href="?set_default=<?= $addr['id'] ?>" class="btn-set-default">Jadikan Default</a>
             <?php endif; ?>
         </div>
-        <?php endwhile; ?>
+        <?php endforeach; ?>
     <?php else: ?>
         <div class="empty-state">
-            <i class="fas fa-map-marker-alt fa-3x mb-3"></i>
+            <i class="fas fa-map-marker-alt fa-3x mb-3 text-muted"></i>
             <p>Belum ada alamat tersimpan.</p>
+            <small>Klik "Tambah alamat" di atas.</small>
         </div>
     <?php endif; ?>
 
-    <!-- Modal Tambah/Edit Alamat -->
+    <!-- MODAL TAMBAH/EDIT ALAMAT -->
     <div class="modal fade" id="addressModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
@@ -168,24 +230,33 @@ if(isset($_GET['edit'])){
                     <form method="POST">
                         <?php if($edit_data): ?>
                             <input type="hidden" name="edit_id" value="<?= $edit_data['id'] ?>">
-                            <input type="hidden" name="phone" value="<?= $edit_data['customer_phone'] ?>">
-                        <?php else: ?>
-                            <input type="tel" name="phone" class="form-control" placeholder="Nomor Telepon" value="<?= $phone ?>" required>
+                            <!-- Phone tidak perlu diinput saat edit, pakai session -->
+                            <input type="hidden" name="phone" value="<?= $phone ?>">
                         <?php endif; ?>
                         
-                        <input type="text" name="name" class="form-control" placeholder="Nama Penerima" value="<?= $edit_data['customer_name'] ?? '' ?>" required>
-                        <textarea name="address" class="form-control" placeholder="Alamat Lengkap (Jalan, RT/RW, Patokan)" rows="3" required><?= $edit_data['full_address'] ?? '' ?></textarea>
+                        <label class="form-label small fw-bold">Nama Penerima</label>
+                        <input type="text" name="name" class="form-control" placeholder="Nama Lengkap" value="<?= $edit_data['customer_name'] ?? '' ?>" required>
+                        
+                        <label class="form-label small fw-bold">Alamat Lengkap</label>
+                        <textarea name="address" class="form-control" placeholder="Jalan, RT/RW, Kelurahan, Kecamatan, Patokan" rows="3" required><?= $edit_data['full_address'] ?? '' ?></textarea>
+                        
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                            <input type="text" name="city" class="form-control" placeholder="Kota/Kabupaten" value="<?= $edit_data['city'] ?? '' ?>" required>
-                            <input type="text" name="province" class="form-control" placeholder="Provinsi" value="<?= $edit_data['province'] ?? '' ?>" required>
+                            <div>
+                                <label class="form-label small fw-bold">Kota/Kab</label>
+                                <input type="text" name="city" class="form-control" placeholder="Kota" value="<?= $edit_data['city'] ?? '' ?>" required>
+                            </div>
+                            <div>
+                                <label class="form-label small fw-bold">Provinsi</label>
+                                <input type="text" name="province" class="form-control" placeholder="Provinsi" value="<?= $edit_data['province'] ?? '' ?>" required>
+                            </div>
                         </div>
                         
-                        <div class="form-check mt-2">
+                        <div class="form-check mt-3">
                             <input class="form-check-input" type="checkbox" name="is_default" id="isDefault" <?= ($edit_data['is_default'] ?? false) ? 'checked' : '' ?>>
                             <label class="form-check-label" for="isDefault">Jadikan alamat utama</label>
                         </div>
 
-                        <button type="submit" name="save_address" class="btn-save mt-3"><?= $edit_data ? 'Simpan Perubahan' : 'Simpan Alamat' ?></button>
+                        <button type="submit" name="save_address" class="btn-save mt-4"><?= $edit_data ? 'Simpan Perubahan' : 'Simpan Alamat' ?></button>
                     </form>
                 </div>
             </div>
@@ -198,7 +269,8 @@ if(isset($_GET['edit'])){
     // Auto open modal if editing
     <?php if($edit_data): ?>
         document.addEventListener('DOMContentLoaded', () => {
-            new bootstrap.Modal(document.getElementById('addressModal')).show();
+            var myModal = new bootstrap.Modal(document.getElementById('addressModal'));
+            myModal.show();
         });
     <?php endif; ?>
 </script>

@@ -1,6 +1,5 @@
 <?php include 'config.php';
 
-
 // 🔥 AMBIL SETTINGS + STORE PROFILE DARI DATABASE 🔥
 $settings = [];
 $profile = [];
@@ -61,50 +60,26 @@ if(isset($_POST['update_status'])){
     exit;
 }
 
-// Di index.php - Ganti seluruh blok if(isset($_POST['add_to_cart']))
-
+// Logika Tambah ke Cart (Dengan Variant)
 if(isset($_POST['add_to_cart'])){
     $id = $_POST['id'];
     $name = $_POST['name'];
     $price = $_POST['price'];
-    
-    // Ambil varian dari input hidden (yang diisi oleh JavaScript omSubmit)
-    // Jika kosong, beri default 'Regular'
-    $variant = isset($_POST['variant']) && !empty($_POST['variant']) ? $_POST['variant'] : 'Regular';
-
-    // Buat kunci unik untuk item keranjang: ID_PRODUK_VARIAN
-    // Contoh: 5_Level2-Bakso
-    $unique_key = $id . '_' . str_replace(' ', '', $variant);
-
-    $cart_item = [
-        'id' => $id, 
-        'name' => $name, 
-        'price' => $price, 
-        'qty' => 1, 
-        'variant' => $variant,
-        'image' => $_POST['image'] ?? '', // Pastikan image juga dikirim jika ada
-        'unique_key' => $unique_key
-    ];
-
+    $variant = $_POST['variant'] ?? '';
+    $cart_item = ['id' => $id, 'name' => $name, 'price' => $price, 'qty' => 1, 'variant' => $variant];
     $found = false;
     if(isset($_SESSION['cart'])){
         foreach($_SESSION['cart'] as $key => $item){
-            // CEK BERDASARKAN UNIQUE KEY (ID + VARIAN)
-            // Bukan cuma ID!
-            if(isset($item['unique_key']) && $item['unique_key'] == $unique_key){
+            if($item['id'] == $id && $item['variant'] == $variant){
                 $_SESSION['cart'][$key]['qty']++;
                 $found = true;
                 break;
             }
         }
     }
-
     if(!$found){
-        // Tambahkan sebagai item BARU di array (akan muncul paling atas/terakhir tergantung loop)
-        // Untuk muncul "di atasnya", kita bisa pakai array_unshift, tapi biasanya append lebih aman untuk urutan waktu
         $_SESSION['cart'][] = $cart_item;
     }
-
     // ✅ FIX: Jika "Beli Sekarang", langsung ke checkout
     if(isset($_POST['buy_now']) && $_POST['buy_now'] == '1'){
         header("Location: checkout.php");
@@ -114,17 +89,18 @@ if(isset($_POST['add_to_cart'])){
     exit;
 }
 
-// Ambil produk dari database
-// Ambil produk dari database (AMBIL SEMUA, JANGAN DIFILTER)
+// Ambil produk dari database (AMBIL SEMUA PRODUK, JANGAN DIFILTER)
 $joinCat = "LEFT JOIN categories c ON p.category_id = c.id";
 $selectCat = "c.name as category_name";
-// Kita ambil semua produk, nanti kita cek statusnya di HTML
+
+// Kita ambil semua produk, nanti kita cek status is_available atau stock di loop PHP
 $result = mysqli_query($conn, "SELECT p.*, {$selectCat} FROM products p $joinCat ORDER BY p.created_at DESC");
 
 $products = [];
 while($row = mysqli_fetch_assoc($result)){
-    // Cek kolom is_available atau stock
+    // Cek kolom is_available atau stock untuk menentukan status
     $isAvailable = 1; // Default tersedia
+    
     if(isset($row['is_available'])) {
         $isAvailable = (int)$row['is_available'];
     } elseif(isset($row['stock'])) {
@@ -138,17 +114,17 @@ while($row = mysqli_fetch_assoc($result)){
         'category' => $row['category_name'] ?? 'all',
         'image' => !empty($row['image']) ? 'uploads/' . $row['image'] : '',
         'description' => $row['description'] ?? '',
-        'is_available' => $isAvailable, // <--- PENTING: Simpan status ketersediaan
+        'is_available' => $isAvailable, // <--- PENTING: Simpan status ketersediaan di array
         'has_variant' => false,
         'variants' => [],
-        'toppings' => [], // Siapkan array kosong dulu
-        'levels' => []    // Siapkan array kosong dulu
+        'toppings' => [], 
+        'levels' => []    
     ];
 }
-// 🔥 Ambil toppings & levels untuk setiap produk
+
+// 🔥 Ambil toppings & levels untuk setiap produk (Sama seperti kode asli Anda, pastikan ini ada)
 foreach($products as $k => $p){
     $pid = (int)$p['id'];
-    
     // Toppings
     $t_query = mysqli_query($conn, "
         SELECT t.id, t.name, t.price
@@ -254,42 +230,6 @@ if(isset($_SESSION['user_phone'])){
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 <style>
-    /* Efek Produk Tidak Tersedia */
-.product-card.unavailable {
-    opacity: 0.6; /* Membuat transparan/abu-abu */
-    filter: grayscale(80%); /* Membuat gambar hitam putih */
-    pointer-events: none; /* MENCEGAH KLIK pada area kartu */
-    position: relative;
-}
-
-/* Overlay Tulisan Stok Habis */
-.out-of-stock-overlay {
-    position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0, 0, 0, 0.4);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 10;
-    border-radius: 20px; /* Sesuaikan dengan radius product-card */
-}
-
-.out-of-stock-overlay span {
-    background: #dc3545; /* Warna Merah */
-    color: white;
-    padding: 8px 15px;
-    font-weight: bold;
-    font-size: 0.9rem;
-    border-radius: 20px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-    transform: rotate(-5deg);
-}
-
-/* Aktifkan kembali klik hanya untuk tombol Favorit jika mau */
-.product-card.unavailable .favorite-btn {
-    pointer-events: auto; 
-    z-index: 11;
-}
 :root {
     --primary: #8B6F4E;
     --primary-dark: #6B5637;
@@ -1324,6 +1264,42 @@ body {
 #modalDetail .modal-body {
     scroll-behavior: smooth;
 }
+/* Efek Produk Tidak Tersedia */
+.product-card.unavailable {
+    opacity: 0.6; /* Membuat transparan/abu-abu */
+    filter: grayscale(80%); /* Membuat gambar hitam putih */
+    pointer-events: none; /* MENCEGAH KLIK pada area kartu */
+    position: relative;
+}
+
+/* Overlay Tulisan Stok Habis */
+.out-of-stock-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    border-radius: 20px; /* Sesuaikan dengan radius product-card */
+}
+
+.out-of-stock-overlay span {
+    background: #dc3545; /* Warna Merah */
+    color: white;
+    padding: 8px 15px;
+    font-weight: bold;
+    font-size: 0.9rem;
+    border-radius: 20px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    transform: rotate(-5deg);
+}
+
+/* Aktifkan kembali klik hanya untuk tombol Favorit jika mau */
+.product-card.unavailable .favorite-btn {
+    pointer-events: auto;
+    z-index: 11;
+}
 </style>
 </head>
 <body>
@@ -1338,6 +1314,7 @@ body {
             <li><a href="riwayat.php">Pesanan</a></li>
         </ul>
         <div class="nav-icons">
+
             
             <!-- Cart Icon -->
             <a href="checkout.php">
@@ -1405,77 +1382,73 @@ body {
 
 <!-- Products Grid -->
 <div class="products-grid">
-    <?php foreach($products as $p): 
-        $category = strtolower($p['category'] ?? 'all');
-        
-        // Cek ketersediaan produk (default 1 jika kolom tidak ada)
-        $isAvail = $p['is_available'] ?? 1; 
-        
-        // Tambahkan class 'unavailable' jika stok habis
-        $classUnavailable = ($isAvail == 0) ? 'unavailable' : '';
-    ?>
+<?php foreach($products as $p):
+    $category = strtolower($p['category'] ?? 'all');
     
-    <!-- PERBAIKAN: Kembalikan data-bs-toggle dan data-bs-target agar Modal Detail muncul -->
-    <!-- Tambahkan class <?= $classUnavailable ?> untuk efek abu-abu -->
-    <div class="product-card <?= $classUnavailable ?>"
-         data-bs-toggle="modal"
-         data-bs-target="#modalDetail"
-         data-id="<?= $p['id'] ?>"
-         data-name="<?= $p['name'] ?>"
-         data-price="<?= $p['price'] ?>"
-         data-desc="<?= $p['description'] ?>"
-         data-img="<?= $p['image'] ?>"
-         data-category="<?= $category ?>"
-         data-has-variant="0"
-         data-variants='[]'
-         data-toppings='<?= htmlspecialchars(json_encode($p['toppings']), ENT_QUOTES) ?>'
-         data-levels='<?= htmlspecialchars(json_encode($p['levels']), ENT_QUOTES) ?>'>
+    // Cek ketersediaan produk dari array yang sudah kita buat di atas
+    $isAvail = $p['is_available'] ?? 1; 
+    
+    // Tambahkan class 'unavailable' jika stok habis
+    $classUnavailable = ($isAvail == 0) ? 'unavailable' : '';
+?>
 
-        <div class="product-image">
-            <button class="favorite-btn" onclick="toggleFavorite(this, event)">
-                <i class="far fa-heart"></i>
-            </button>
+<!-- Tambahkan class <?= $classUnavailable ?> agar CSS abu-abu bekerja -->
+<div class="product-card <?= $classUnavailable ?>"
+     data-bs-toggle="modal"
+     data-bs-target="#modalDetail"
+     data-id="<?= $p['id'] ?>"
+     data-name="<?= $p['name'] ?>"
+     data-price="<?= $p['price'] ?>"
+     data-desc="<?= $p['description'] ?>"
+     data-img="<?= $p['image'] ?>"
+     data-category="<?= $category ?>"
+     data-has-variant="0"
+     data-variants='[]'
+     data-toppings='<?= htmlspecialchars(json_encode($p['toppings']), ENT_QUOTES) ?>'
+     data-levels='<?= htmlspecialchars(json_encode($p['levels']), ENT_QUOTES) ?>'>
+     
+    <div class="product-image">
+        <button class="favorite-btn" onclick="toggleFavorite(this, event)">
+            <i class="far fa-heart"></i>
+        </button>
+        
+        <!-- Overlay Stok Habis (Muncul jika is_available = 0) -->
+        <?php if($isAvail == 0): ?>
+        <div class="out-of-stock-overlay">
+            <span>Stok Habis</span>
+        </div>
+        <?php endif; ?>
+
+        <?php if(!empty($p['image'])): ?>
+        <img src="<?= $p['image'] ?>" alt="<?= $p['name'] ?>" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+        <i class="fas fa-utensils" style="display: none; font-size: 5rem; color: var(--primary); opacity: 0.3;"></i>
+        <?php else: ?>
+        <i class="fas fa-utensils"></i>
+        <?php endif; ?>
+    </div>
+    
+    <div class="product-info">
+        <h3 class="product-name"><?= $p['name'] ?></h3>
+        <p class="product-desc"><?= $p['description'] ?></p>
+        <div class="product-footer">
+            <span class="product-price">Rp <?= number_format($p['price'], 0, ',', '.') ?></span>
             
-            <!-- Overlay Stok Habis (Muncul jika is_available = 0) -->
-            <?php if($isAvail == 0): ?>
-                <div class="out-of-stock-overlay">
-                    <span>Stok Habis</span>
-                </div>
-            <?php endif; ?>
-
-            <?php if(!empty($p['image'])): ?>
-                <img src="<?= $p['image'] ?>" alt="<?= $p['name'] ?>" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
-                <i class="fas fa-utensils" style="display: none; font-size: 5rem; color: var(--primary); opacity: 0.3;"></i>
+            <?php if($isAvail == 1): ?>
+                <!-- Jika Tersedia: Tombol Aktif -->
+                <button onclick="openVariantFromCard(<?= $p['id'] ?>, '<?= addslashes($p['name']) ?>', <?= $p['price'] ?>, '<?= $p['image'] ?>', '<?= strtolower($p['category']) ?>', '<?= htmlspecialchars(json_encode($p['levels']), ENT_QUOTES) ?>', '<?= htmlspecialchars(json_encode($p['toppings']), ENT_QUOTES) ?>')" style="background: var(--primary); color: white; border: none; padding: 6px 12px; border-radius: 15px; font-weight: 600; cursor: pointer; font-size: 0.8rem;">
+                    <i class="fas fa-cart-plus"></i> Tambah
+                </button>
             <?php else: ?>
-                <i class="fas fa-utensils"></i>
+                <!-- Jika Tidak Tersedia: Tombol Disabled/Grey -->
+                <button disabled style="background: #ccc; color: #666; border: none; padding: 6px 12px; border-radius: 15px; font-weight: 600; cursor: not-allowed; font-size: 0.8rem;">
+                    Habis
+                </button>
             <?php endif; ?>
         </div>
-
-        <div class="product-info">
-            <h3 class="product-name"><?= $p['name'] ?></h3>
-            <p class="product-desc"><?= $p['description'] ?></p>
-            <div class="product-footer">
-                <span class="product-price">Rp <?= number_format($p['price'], 0, ',', '.') ?></span>
-                
-                <?php if($isAvail == 1): ?>
-                    <!-- Jika Tersedia: Tombol Aktif -->
-                    <button 
-                        onclick="openVariantFromCard(<?= $p['id'] ?>, '<?= addslashes($p['name']) ?>', <?= $p['price'] ?>, '<?= $p['image'] ?>', '<?= strtolower($p['category']) ?>', '<?= htmlspecialchars(json_encode($p['levels']), ENT_QUOTES) ?>', '<?= htmlspecialchars(json_encode($p['toppings']), ENT_QUOTES) ?>')" 
-                        style="background: var(--primary); color: white; border: none; padding: 6px 12px; border-radius: 15px; font-weight: 600; cursor: pointer; font-size: 0.8rem;">
-                        <i class="fas fa-cart-plus"></i> Tambah
-                    </button>
-                <?php else: ?>
-                    <!-- Jika Tidak Tersedia: Tombol Disabled/Grey -->
-                    <button disabled style="background: #ccc; color: #666; border: none; padding: 6px 12px; border-radius: 15px; font-weight: 600; cursor: not-allowed; font-size: 0.8rem;">
-                        Habis
-                    </button>
-                <?php endif; ?>
-            </div>
-        </div>
     </div>
-    <?php endforeach; ?>
 </div>
-    </div>
+<?php endforeach; ?>
+</div>
 
 </section>
 
@@ -1974,86 +1947,7 @@ document.getElementById('trackingInput')?.addEventListener('keypress', function(
         trackOrder();
     }
 });
-// ============================================================
-// FUNGSI TAMBAH KERANJANG LANGSUNG (TANPA MODAL VARIAN)
-// ============================================================
-function addToCartDirect(productId, productName, productPrice, productImage) {
-    // Buat form dinamis untuk submit data
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = 'index.php';
-    form.style.display = 'none';
 
-    // Input hidden untuk add_to_cart
-    const inputAddToCart = document.createElement('input');
-    inputAddToCart.type = 'hidden';
-    inputAddToCart.name = 'add_to_cart';
-    inputAddToCart.value = '1';
-    form.appendChild(inputAddToCart);
-
-    // Input hidden untuk ID produk
-    const inputId = document.createElement('input');
-    inputId.type = 'hidden';
-    inputId.name = 'id';
-    inputId.value = productId;
-    form.appendChild(inputId);
-
-    // Input hidden untuk Nama produk
-    const inputName = document.createElement('input');
-    inputName.type = 'hidden';
-    inputName.name = 'name';
-    inputName.value = productName;
-    form.appendChild(inputName);
-
-    // Input hidden untuk Harga produk
-    const inputPrice = document.createElement('input');
-    inputPrice.type = 'hidden';
-    inputPrice.name = 'price';
-    inputPrice.value = productPrice;
-    form.appendChild(inputPrice);
-
-    // Input hidden untuk Varian (default 'Regular' untuk tambah langsung)
-    const inputVariant = document.createElement('input');
-    inputVariant.type = 'hidden';
-    inputVariant.name = 'variant';
-    inputVariant.value = 'Regular'; // Default varian untuk tambah langsung
-    form.appendChild(inputVariant);
-
-    // Input hidden untuk Gambar produk
-    const inputImage = document.createElement('input');
-    inputImage.type = 'hidden';
-    inputImage.name = 'image';
-    inputImage.value = productImage;
-    form.appendChild(inputImage);
-
-    // Input hidden untuk buy_now (0 karena ini tambah keranjang)
-    const inputBuyNow = document.createElement('input');
-    inputBuyNow.type = 'hidden';
-    inputBuyNow.name = 'buy_now';
-    inputBuyNow.value = '0';
-    form.appendChild(inputBuyNow);
-
-    // Tambahkan form ke body dan submit
-    document.body.appendChild(form);
-    form.submit();
-}
-// ============================================================
-// FUNGSI BUKA MODAL VARIAN LANGSUNG DARI KARTU PRODUK
-// ============================================================
-function openVariantFromCard(id, name, price, image, category, levelsJson, toppingsJson) {
-    // 1. Isi dmState dengan data dari kartu produk
-    dmState.id       = id;
-    dmState.name     = name;
-    dmState.price    = parseInt(price) || 0;
-    dmState.image    = image || 'assets/images/placeholder.png';
-    dmState.category = category || '';
-    dmState.levels   = JSON.parse(levelsJson || '[]');
-    dmState.toppings = JSON.parse(toppingsJson || '[]');
-
-    // 2. Langsung panggil dmOpenOrder dengan action 'cart'
-    // Ini akan membuka modal #orderModal untuk pilih level/topping/suhu
-    dmOpenOrder('cart');
-}
 </script>
 
 <!-- ✅ FOOTER -->
@@ -2175,7 +2069,9 @@ function openVariantFromCard(id, name, price, image, category, levelsJson, toppi
                 <div style="flex: 1; margin: 0 12px;">
                     <input type="text" placeholder="Cari di Texcer Hot" style="width: 100%; padding: 8px 12px; border: 1px solid #e0e0e0; border-radius: 8px; background: #f5f5f5;">
                 </div>
-                
+                <button class="btn btn-link" style="color: #333; padding: 0;">
+
+                </button>
             </div>
 
             <div class="modal-body" style="padding: 0; overflow-y: auto; max-height: calc(100vh - 140px);">
@@ -2199,20 +2095,14 @@ function openVariantFromCard(id, name, price, image, category, levelsJson, toppi
                         <span style="color: #999;">(1,5 rb)</span>
                         <span style="color: #999;">|</span>
                         <span style="color: #999;">10rb+ terjual</span>
-                       
                     </div>
-                </div>
-                    
-                   <!-- ✅ DESKRIPSI PRODUK (PENGGANTI BAGIAN YANG DIHAPUS) -->
-<div style="padding: 16px; border-bottom: 1px solid #f0f0f0;">
-    <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 8px; color: var(--text-dark);">
-        <i class="fas fa-info-circle me-2" style="color: var(--primary);"></i>Deskripsi Produk
-    </h4>
-    <p id="md-desc" style="font-size: 0.9rem; color: var(--text-gray); line-height: 1.6; margin: 0;">
+                        <!-- ✅ DESKRIPSI SINGKAT DI BAWAH RATING -->
+    <p id="md-desc-short" style="font-size: 0.85rem; color: #666; line-height: 1.5; margin: 0;">
         <!-- Isi deskripsi akan diisi otomatis oleh JavaScript saat modal dibuka -->
         Memuat deskripsi...
     </p>
-</div>
+                </div>
+
 
                 <!-- Store Info -->
                 <div style="display: flex; align-items: center; gap: 12px;">
@@ -2237,28 +2127,41 @@ function openVariantFromCard(id, name, price, image, category, levelsJson, toppi
     </div>
     <button onclick="showStoreProfile()" style="background: var(--primary); border: none; padding: 8px 16px; border-radius: 20px; font-weight: 600; color: white; cursor: pointer;">Kunjungi</button>
 </div>
+                <!-- Komisi Section -->
+                <div style="padding: 12px 16px; background: #FFF8E1; border-bottom: 1px solid #f0f0f0;">
+                    
+                  
+                </div>
+            </div>
 
 <!-- ✅ PROFIL TOKO DINAMIS (Diambil dari Database) -->
 <div id="storeProfileContent" style="display: none;">
     <!-- Cover Foto Toko -->
     <div style="width: 100%; height: 200px; position: relative; overflow: hidden;">
+        <!-- PERBAIKAN GAMBAR: Menggunakan $profile['cover_path'] dari database -->
         <img src="<?= !empty($profile['cover_path']) ? htmlspecialchars($profile['cover_path']) : 'https://via.placeholder.com/1200x400?text=Texcer+Hot' ?>" 
              style="width:100%; height:100%; object-fit: cover;">
+        
         <div style="position: absolute; bottom: 0; left: 0; right: 0; padding: 20px; background: linear-gradient(transparent, rgba(0,0,0,0.7));">
             <h3 style="margin: 0; color: white; font-size: 1.5rem;"><?= htmlspecialchars($profile['store_name']) ?></h3>
             <p style="margin: 4px 0 0; color: rgba(255,255,255,0.9); font-size: 0.95rem;"><?= htmlspecialchars($profile['tagline']) ?></p>
         </div>
+        
         <!-- Tombol Back -->
-      
+        <button onclick="backToProduct()" style="position: absolute; top: 15px; left: 15px; background: white; border: none; width: 40px; height: 40px; border-radius: 50%; box-shadow: 0 2px 5px rgba(0,0,0,0.2); cursor: pointer; display:flex; align-items:center; justify-content:center;">
+            <i class="fas fa-arrow-left" style="color: var(--primary);"></i>
+        </button>
     </div>
 
     <div style="padding: 20px;">
         <!-- Logo & Info Utama -->
         <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
+            <!-- PERBAIKAN LOGO: Menggunakan $profile['logo_path'] dari database -->
             <div style="width: 70px; height: 70px; border-radius: 50%; background: #eee; overflow: hidden; border: 3px solid var(--primary); flex-shrink: 0;">
                 <img src="<?= !empty($profile['logo_path']) ? htmlspecialchars($profile['logo_path']) : 'https://via.placeholder.com/70?text=TH' ?>" 
                      style="width:100%; height:100%; object-fit: cover;">
             </div>
+            
             <div style="flex: 1;">
                 <h3 style="margin: 0; font-size: 1.3rem; font-weight: 700;"><?= htmlspecialchars($profile['store_name']) ?></h3>
                 <p style="margin: 4px 0; color: var(--text-gray); font-size: 0.9rem;">
@@ -2270,6 +2173,7 @@ function openVariantFromCard(id, name, price, image, category, levelsJson, toppi
                     <i class="fas fa-circle" style="font-size: 8px; margin-right: 4px;"></i> Online • Merespons cepat
                 </p>
             </div>
+            
             <div style="text-align: right;">
                 <span style="background: var(--accent); color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;">
                     Sejak <?= $profile['established_year'] ?>
@@ -2277,13 +2181,25 @@ function openVariantFromCard(id, name, price, image, category, levelsJson, toppi
             </div>
         </div>
 
-        <!-- Deskripsi Toko -->
-        <div style="background: var(--bg-cream); padding: 15px; border-radius: 12px; margin-bottom: 20px;">
-            <h5 style="margin: 0 0 8px; font-size: 1rem; font-weight: 700;">Tentang Kami</h5>
-            <p style="margin: 0; font-size: 0.9rem; color: var(--text-gray); line-height: 1.6;">
-                <?= nl2br(htmlspecialchars($profile['description'])) ?>
-            </p>
-        </div>
+<!-- Deskripsi Toko DENGAN FITUR BACA SELENGKAPNYA -->
+<div style="background: var(--bg-cream); padding: 15px; border-radius: 12px; margin-bottom: 20px;">
+    <h5 style="margin: 0 0 8px; font-size: 1rem; font-weight: 700;">Tentang Kami</h5>
+    
+    <!-- Container Deskripsi -->
+    <div id="desc-container" style="position: relative;">
+        <p id="store-desc-text" style="margin: 0; font-size: 0.9rem; color: var(--text-gray); line-height: 1.6; max-height: 4.8em; overflow: hidden; transition: max-height 0.3s ease;">
+            <?= nl2br(htmlspecialchars($profile['description'])) ?>
+        </p>
+        
+        <!-- Overlay Gradient untuk efek memudar -->
+        <div id="desc-overlay" style="position: absolute; bottom: 0; left: 0; right: 0; height: 20px; background: linear-gradient(to bottom, transparent, var(--bg-cream)); pointer-events: none;"></div>
+    </div>
+    
+    <!-- Tombol Baca Selengkapnya / Sembunyikan -->
+    <button id="btn-read-more" onclick="toggleDescription()" style="background: none; border: none; color: var(--primary); font-weight: 600; cursor: pointer; padding: 5px 0; margin-top: 5px; font-size: 0.9rem;">
+        Baca Selengkapnya
+    </button>
+</div>
 
         <!-- Stats -->
         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px;">
@@ -2303,7 +2219,7 @@ function openVariantFromCard(id, name, price, image, category, levelsJson, toppi
 
         <!-- Info Lokasi & Kontak -->
         <div style="margin-bottom: 20px;">
-            <h5 style="font-size: 1rem; margin-bottom: 12px; font-weight: 700;">📍 Lokasi & Kontak</h5>
+            <h5 style="font-size: 1rem; margin-bottom: 12px; font-weight: 700;"> Lokasi & Kontak</h5>
             
             <div style="display: flex; gap: 8px; margin-bottom: 10px; font-size: 0.9rem;">
                 <i class="fas fa-map-marker-alt" style="width: 20px; color: var(--primary); margin-top: 3px;"></i>
@@ -2360,7 +2276,6 @@ function openVariantFromCard(id, name, price, image, category, levelsJson, toppi
         </div>
     </div>
 </div>
-
           <!-- Bottom Action Bar -->
 <!-- ✅ FIX: Form Add to Cart & Beli Sekarang (dipindah ke luar modal-footer agar valid HTML) -->
 <form method="POST" id="modalFormPesan" action="index.php">
@@ -2369,7 +2284,6 @@ function openVariantFromCard(id, name, price, image, category, levelsJson, toppi
     <input type="hidden" name="name"    id="modal-product-name">
     <input type="hidden" name="price"   id="modal-product-price">
     <input type="hidden" name="variant" id="modal-product-variant" value="">
-    <input type="hidden" name="image"   id="modal-product-image" value="">
     <input type="hidden" name="buy_now" id="modal-buy-now" value="0">
 </form>
 
@@ -2388,13 +2302,11 @@ function openVariantFromCard(id, name, price, image, category, levelsJson, toppi
     </button>
 
 
-
 <!-- Tombol Beli Sekarang → buka modal pilih topping/level/suhu -->
 <button type="button"
     onclick="dmOpenOrder('buy')"
     style="background: var(--primary); color: white; border: none; border-radius: 24px; padding: 10px 24px; font-weight: 600; cursor: pointer; flex: 1;">
     <div style="font-size: 0.95rem;">Beli sekarang</div>
-    <div style="font-size: 0.8rem; opacity: 0.85;"><span id="md-price-bottom">Rp 0</span> | Pengiriman gratis</div>
 </button>
 
 </div>
@@ -2527,7 +2439,15 @@ modal.addEventListener('show.bs.modal', function (event) {
     // 3. Update UI Gambar & Teks Dasar
     document.getElementById('md-img').src = dmState.image;
     document.getElementById('md-name').innerText = dmState.name;
-    document.getElementById('md-desc').innerText = button.getAttribute('data-desc') || '';
+   // ✅ TAMBAHKAN BARIS INI UNTUK MENGISI DESKRIPSI SINGKAT
+    var descShortEl = document.getElementById('md-desc-short');
+    if(descShortEl) {
+        // Ambil deskripsi dari atribut data-desc, potong jika terlalu panjang (opsional)
+        var fullDesc = button.getAttribute('data-desc') || 'Tidak ada deskripsi untuk produk ini.';
+        // Jika ingin memotong teks sampai 100 karakter:
+        // var shortDesc = fullDesc.length > 100 ? fullDesc.substring(0, 100) + '...' : fullDesc;
+        descShortEl.innerText = fullDesc; 
+    }
 
     // 4. ✅ PENTING: Isi Harga di SEMUA Tempat agar tidak Rp 0
     // A. Di tengah modal (detail produk)
@@ -3415,113 +3335,82 @@ document.getElementById('detailModal').addEventListener('click', function(e) {
   if (e.target === this) closeDetailModal();
 });
 
-// ============================================================
-// MODAL 1: DETAIL PRODUK -> ORDER MODAL (FINAL FIX - NO DELAY)
-// Ganti fungsi dmOpenOrder yang lama dengan ini
-// ============================================================
+// Tombol Keranjang / Beli Sekarang dari modal detail
 function dmOpenOrder(action) {
-    // 1. PAKSA TUTUP MODAL BOOTSTRAP (#modalDetail) SECARA INSTAN
-    var bsModalEl = document.getElementById('modalDetail');
-    var bsModal = bootstrap.Modal.getInstance(bsModalEl);
-    if (bsModal) {
-        bsModal.hide();
-    }
-    // Hapus display block/flex yang mungkin tertinggal
-    bsModalEl.style.display = 'none';
-    bsModalEl.classList.remove('show');
-    bsModalEl.setAttribute('aria-hidden', 'true');
-    
-    // 2. BERSIHKAN BACKDROP (LAYAR GELAP) BOOTSTRAP
-    var backdrops = document.querySelectorAll('.modal-backdrop');
-    backdrops.forEach(backdrop => backdrop.remove());
-    document.body.classList.remove('modal-open');
-    document.body.style.paddingRight = '';
+  // Tutup #modalDetail (Bootstrap modal) dengan benar
+  var bsModal = bootstrap.Modal.getInstance(document.getElementById('modalDetail'));
+  if (bsModal) bsModal.hide();
 
-    // 3. ISI STATE OMSTATE DENGAN DATA SEGAR DARI DMSTATE
-    omState.action    = action;
-    omState.id        = dmState.id;
-    omState.name      = dmState.name;
-    omState.basePrice = parseInt(dmState.price) || 0;
-    omState.category  = dmState.category;
-    omState.qty       = 1;
-    omState.suhu      = null;
-    omState.level     = null;
-    omState.levelName = '';
-    omState.levelPrice = 0;
-    omState.toppings  = {};
+  omState.action    = action;
+  omState.id        = dmState.id;
+  omState.name      = dmState.name;
+  omState.basePrice = parseInt(dmState.price);
+  omState.category  = dmState.category;
+  omState.qty       = 1;
+  omState.suhu      = null;
+  omState.level     = null;
+  omState.levelName = '';
+  omState.toppings  = {};
 
-    // Debugging: Cek data
-    if (!omState.id || !omState.name) {
-        console.error("Data produk kosong!", dmState);
-        alert("Error: Data produk tidak valid. Silakan refresh halaman.");
-        return;
-    }
+  // Set header modal order
+  document.getElementById('omImg').src              = dmState.image || 'assets/images/placeholder.jpg';
+  document.getElementById('omName').textContent      = dmState.name;
+  document.getElementById('omBaseLabel').textContent = 'Harga dasar: ' + dmFmt(dmState.price);
+  document.getElementById('omBasePrice').textContent = dmFmt(dmState.price);
+  document.getElementById('omQty').textContent       = 1;
+  document.getElementById('omNote').value            = '';
+  document.getElementById('omBreakdown').innerHTML   = '';
+  document.getElementById('omLevelWarn').style.display = 'none';
+  document.getElementById('omSuhuWarn').style.display  = 'none';
 
-    // 4. UPDATE UI HEADER MODAL ORDER
-    document.getElementById('omImg').src              = dmState.image || 'assets/images/placeholder.jpg';
-    document.getElementById('omName').textContent      = dmState.name;
-    document.getElementById('omBaseLabel').textContent = 'Harga dasar: ' + dmFmt(omState.basePrice);
-    document.getElementById('omBasePrice').textContent = dmFmt(omState.basePrice);
-    document.getElementById('omQty').textContent       = 1;
-    document.getElementById('omNote').value            = '';
-    document.getElementById('omBreakdown').innerHTML   = '';
-    document.getElementById('omLevelWarn').style.display = 'none';
-    document.getElementById('omSuhuWarn').style.display  = 'none';
-    document.getElementById('omSubmitLabel').textContent =
-        action === 'buy' ? '⚡ Beli Sekarang' : '🛒 Tambah ke Keranjang';
+  document.getElementById('omSubmitLabel').textContent =
+    action === 'buy' ? '⚡ Beli Sekarang' : '🛒 Tambah ke Keranjang';
 
-    // 5. RENDER SUHU (MINUMAN)
-    var cat       = (dmState.category || '').toLowerCase();
-    var isMinuman = cat === 'minuman';
-    document.getElementById('omSuhuSection').style.display = isMinuman ? 'block' : 'none';
-    document.querySelectorAll('#omSuhuSection [onclick]').forEach(function(el) {
-        el.style.borderColor = '#e8e8e8';
-        el.style.background  = '#fff';
-        el.querySelector('div:last-child').style.color = '#1a1a1a';
+  // --- SUHU: hanya minuman ---
+  var cat       = (dmState.category || '').toLowerCase();
+  var isMinuman = cat === 'minuman';
+  document.getElementById('omSuhuSection').style.display = isMinuman ? 'block' : 'none';
+  document.querySelectorAll('#omSuhuSection [onclick]').forEach(function(el) {
+    el.style.borderColor = '#e8e8e8';
+    el.style.background  = '#fff';
+    el.querySelector('div:last-child').style.color = '#1a1a1a';
+  });
+
+  // --- LEVEL: dari database per produk ---
+  var levels = dmState.levels || [];
+  document.getElementById('omLevelSection').style.display = levels.length > 0 ? 'block' : 'none';
+  if (levels.length > 0) {
+    var lvIcons = ['','','','',''];
+    var lvHtml  = '';
+    levels.forEach(function(lv, i) {
+      var extraLabel = lv.price > 0
+        ? '<div style="font-size:10px;color:#c17d2a;margin-top:1px;">+' + dmFmt(lv.price) + '</div>'
+        : '';
+      lvHtml += '<div onclick="omPickLevel(' + lv.id + ',\'' + lv.name.replace(/'/g,"\\'") + '\',' + (lv.price||0) + ',this)"'
+              + ' style="padding:8px 14px;border-radius:10px;border:1.5px solid #e8e8e8;cursor:pointer;text-align:center;min-width:80px;">'
+              + '<div style="font-size:16px;">' + (lvIcons[i] || '') + '</div>'
+              + '<div style="font-size:12px;font-weight:600;margin-top:2px;color:#1a1a1a;">' + lv.name + '</div>'
+              + extraLabel
+              + '</div>';
     });
-    omState.suhu = null;
+    document.getElementById('omLevelList').innerHTML = lvHtml;
+  }
 
-    // 6. RENDER LEVEL PEDAS
-    var levels = dmState.levels || [];
-    document.getElementById('omLevelSection').style.display = levels.length > 0 ? 'block' : 'none';
-    omState.level = null;
-    
-    if (levels.length > 0) {
-        var lvIcons = ['🌶️','🌶️️','🌶️️🌶️','🔥🔥',''];
-        var lvHtml  = '';
-        levels.forEach(function(lv, i) {
-            var extraLabel = lv.price > 0
-                ? '<div style="font-size:10px;color:#c17d2a;margin-top:1px;">+' + dmFmt(lv.price) + '</div>'
-                : '';
-            lvHtml += '<div onclick="omPickLevel(' + lv.id + ',\'' + (lv.name ? lv.name.replace(/'/g,"\\'") : '') + '\',' + (lv.price||0) + ',this)"'
-                + ' style="padding:8px 14px;border-radius:10px;border:1.5px solid #e8e8e8;cursor:pointer;text-align:center;min-width:80px;">'
-                + '<div style="font-size:16px;">' + (lvIcons[i] || '🌶️') + '</div>'
-                + '<div style="font-size:12px;font-weight:600;margin-top:2px;color:#1a1a1a;">' + (lv.name || 'Level '+(i+1)) + '</div>'
-                + extraLabel
-                + '</div>';
-        });
-        document.getElementById('omLevelList').innerHTML = lvHtml;
-    } else {
-        document.getElementById('omLevelList').innerHTML = '';
-    }
+  // --- TOPPING: dari database per produk ---
+  var toppings = dmState.toppings || [];
+  document.getElementById('omToppingSection').style.display = toppings.length > 0 ? 'block' : 'none';
+  if (toppings.length > 0) {
+    omRenderToppings(toppings);
+  } else {
+    document.getElementById('omToppingList').innerHTML = '';
+  }
 
-    // 7. RENDER TOPPING
-    var toppings = dmState.toppings || [];
-    document.getElementById('omToppingSection').style.display = toppings.length > 0 ? 'block' : 'none';
-    omState.toppings = {};
-    
-    if (toppings.length > 0) {
-        omRenderToppings(toppings);
-    } else {
-        document.getElementById('omToppingList').innerHTML = '';
-    }
+  omUpdatePrice();
 
-    // 8. UPDATE HARGA
-    omUpdatePrice();
-
-    // 9. TAMPILKAN MODAL ORDER LANGSUNG (TANPA SETTIMEOUT)
-    var orderModalEl = document.getElementById('orderModal');
-    orderModalEl.style.display = 'flex';
+  // Buka orderModal setelah Bootstrap modal selesai tutup
+  setTimeout(function() {
+    document.getElementById('orderModal').style.display = 'flex';
+  }, 300);
 }
 
 function closeOrderModal() {
@@ -3643,105 +3532,98 @@ function omUpdatePrice() {
 }
 
 // ============================================================
-// SUBMIT ORDER (FINAL FIX: IMAGE & VARIANT UNIQUE)
-// ============================================================
-// ============================================================
-// SUBMIT ORDER (FINAL FIX: IMAGE & VARIANT UNIQUE)
-// Ganti seluruh fungsi omSubmit() yang lama dengan ini
-// ============================================================
-// ============================================================
-// SUBMIT ORDER (FINAL FIX: VARIAN SESUAI PILIHAN USER - SUPPORT TOPPING AS VARIANT)
-// Ganti seluruh fungsi omSubmit() di index.php dengan ini
+// SUBMIT ORDER (PERBAIKAN: GUNAKAN FORM SUBMIT KE INDEX.PHP)
+// Letakkan ini di dalam <script> paling bawah index.php
+// Ganti fungsi omSubmit() yang lama dengan ini
 // ============================================================
 function omSubmit() {
     var cat       = (omState.category || '').toLowerCase();
     var isMinuman = cat === 'minuman';
     
-    // 1. Validasi Suhu & Level
+    // Validasi suhu
     if (isMinuman && !omState.suhu) {
         document.getElementById('omSuhuWarn').style.display = 'block';
         return;
     }
+    
+    // Validasi level — wajib jika section level tampil
     var lvlSection = document.getElementById('omLevelSection');
     if (lvlSection.style.display !== 'none' && !omState.level) {
         document.getElementById('omLevelWarn').style.display = 'block';
         return;
     }
 
-    // 2. Hitung Harga
+    // Kumpulkan topping ids
+    var toppingIds = [];
+    for (var id in omState.toppings) {
+        if (omState.toppings[id]) toppingIds.push(id);
+    }
+
+    // Hitung total harga per item
     var topSum = 0;
     for (var id2 in omState.toppings) {
         if (omState.toppings[id2]) topSum += parseInt(omState.toppings[id2].price);
     }
+    
+    // Harga final per porsi (Harga Dasar + Topping + Level)
     var pricePerItem = omState.basePrice + topSum + (omState.levelPrice || 0);
     
-    // 3. ✅ PENTING: Tentukan Nama Varian Yang Benar
-    var variantName = 'Regular'; // Default
+    // Siapkan Nama Varian untuk ditampilkan di Checkout
+    var variantName = omState.levelName || omState.suhu || 'Regular';
+    var itemName = omState.name + ' (' + variantName + ')';
     
-    if (omState.levelName) {
-        // Prioritas 1: Gunakan nama level (untuk Mie/Mercon)
-        variantName = omState.levelName; 
-    } else if (omState.suhu) {
-        // Prioritas 2: Gunakan suhu (untuk Minuman)
-        variantName = omState.suhu;
-    } else {
-        // Prioritas 3: Cek apakah ada topping yang merupakan varian utama
-        // Untuk Ceker, varian utama adalah Large/Medium/Paket Nasi
-        // Kita cek topping pertama yang dipilih dan lihat apakah namanya mengandung kata kunci
-        var firstVariantTopping = null;
-        for (var id in omState.toppings) {
-            if (omState.toppings[id]) {
-                var tName = omState.toppings[id].name.toLowerCase();
-                // Cek apakah nama topping mengandung kata kunci varian
-                if (tName.includes('large') || tName.includes('medium') || tName.includes('paket') || tName.includes('nasi')) {
-                    firstVariantTopping = omState.toppings[id].name;
-                    break; // Ambil yang pertama saja
-                }
-            }
-        }
-        
-        if (firstVariantTopping) {
-            variantName = firstVariantTopping;
-        }
-        // Jika tidak ada topping varian, tetap 'Regular'
-    }
-
-    console.log("Varian yang akan dikirim:", variantName);
-
-    // 4. Isi Form Hidden
-    var form = document.getElementById('modalFormPesan');
-    
-    document.getElementById('modal-product-id').value      = omState.id;
-    document.getElementById('modal-product-name').value    = omState.name; 
-    document.getElementById('modal-product-price').value   = pricePerItem; 
+    // ✅ FIX: Isi Hidden Input Form yang sudah ada di HTML index.php
+    // Form ID: modalFormPesan
+    document.getElementById('modal-product-id').value = omState.id;
+    document.getElementById('modal-product-name').value = itemName; 
+    document.getElementById('modal-product-price').value = pricePerItem; 
     document.getElementById('modal-product-variant').value = variantName;
     
-    // Pastikan input hidden image ada
-    var imgInput = document.getElementById('modal-product-image');
-    if(imgInput) {
-        var mdImgEl = document.getElementById('md-img');
-        imgInput.value = (mdImgEl && mdImgEl.src) ? mdImgEl.src : '';
-    }
-    
+    // Set Action Form ke index.php (karena logika add_to_cart ada di index.php)
+    var form = document.getElementById('modalFormPesan');
     form.action = 'index.php';
     form.method = 'POST';
     
-    // Logika Buy Now vs Add to Cart
+    // Jika "Beli Sekarang", tambahkan input buy_now=1 agar redirect ke checkout
     if (omState.action === 'buy') {
+        // Hapus input buy_now lama jika ada
         var existingBuy = form.querySelector('input[name="buy_now"]');
         if(existingBuy) existingBuy.remove();
+
         var buyInput = document.createElement('input');
         buyInput.type = 'hidden';
         buyInput.name = 'buy_now';
         buyInput.value = '1';
         form.appendChild(buyInput);
     } else {
+        // Jika hanya tambah keranjang, pastikan buy_now tidak ada atau 0
         var existingBuy = form.querySelector('input[name="buy_now"]');
         if(existingBuy) existingBuy.value = '0';
     }
 
-    // Submit Form
+    // Submit Form secara normal (bukan fetch/ajax)
     form.submit();
+}
+// ============================================================
+// FUNGSI BACA SELENGKAPNYA DESKRIPSI TOKO
+// ============================================================
+function toggleDescription() {
+    const descText = document.getElementById('store-desc-text');
+    const overlay = document.getElementById('desc-overlay');
+    const btn = document.getElementById('btn-read-more');
+    
+    // Cek apakah sedang dipendekkan (max-height 4.8em) atau diperpanjang
+    if (descText.style.maxHeight === 'none') {
+        // Sembunyikan (kembali ke 3 baris)
+        descText.style.maxHeight = '4.8em';
+        overlay.style.display = 'block';
+        btn.innerText = 'Baca Selengkapnya';
+    } else {
+        // Tampilkan Semua
+        descText.style.maxHeight = 'none';
+        overlay.style.display = 'none';
+        btn.innerText = 'Sembunyikan';
+    }
 }
 </script>
 
@@ -3760,14 +3642,14 @@ function omSubmit() {
 
     <!-- Gambar produk -->
     <div style="position:relative; height:220px; flex-shrink:0; overflow:hidden; border-radius:20px 20px 0 0;">
-      
+      <img id="dmImg" src="" alt="" style="width:100%; height:100%; object-fit:cover;">
       <div style="position:absolute; inset:0; background:linear-gradient(to top, rgba(0,0,0,0.4), transparent);"></div>
       <button onclick="closeDetailModal()" style="position:absolute; top:14px; right:14px; width:34px; height:34px; border-radius:50%; border:none; background:rgba(255,255,255,0.9); font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center;">×</button>
     </div>
 
     <!-- Info produk -->
     <div style="padding:18px 20px; flex:1; overflow-y:auto;">
-      
+      <h3 id="dmName" style="margin:0 0 6px; font-size:18px; font-weight:700; color:#1a1a1a;"></h3>
       <p id="dmDesc" style="margin:0 0 14px; font-size:13px; color:#888; line-height:1.6;"></p>
       <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 0; border-top:1px solid #f0f0f0;">
         <span style="font-size:13px; color:#888;">Harga</span>
@@ -3777,8 +3659,11 @@ function omSubmit() {
 
     <!-- Tombol aksi -->
     <div style="padding:14px 20px; border-top:1px solid #f0f0f0; display:flex; gap:10px; flex-shrink:0;">
+      <button onclick="dmOpenOrder('cart')" style="flex:1; padding:13px; background:#fff; color:#8B5A2B; border:2px solid #8B5A2B; border-radius:12px; font-size:14px; font-weight:600; cursor:pointer;">
+        🛒 Keranjang
+      </button>
       <button onclick="dmOpenOrder('buy')" style="flex:2; padding:13px; background:#8B5A2B; color:#fff; border:none; border-radius:12px; font-size:14px; font-weight:600; cursor:pointer;">
-        Beli Sekarang
+        ⚡ Beli Sekarang
       </button>
     </div>
 
@@ -3910,7 +3795,6 @@ function omSubmit() {
   from { transform: translateY(100%); }
   to   { transform: translateY(0); }
 }
-
 </style>
 
 </body>

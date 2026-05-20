@@ -159,27 +159,18 @@ $orders = mysqli_query($conn, "SELECT * FROM orders WHERE $whereSQL ORDER BY cre
         <i class="fas fa-pepper-hot"></i>
         <span>Texcer Hot</span>
     </div>
- <ul class="sidebar-menu">
-    <li><a href="dashboard.php"><i class="fas fa-home"></i><span>Dashboard</span></a></li>
-    <li><a href="orders.php"><i class="fas fa-shopping-bag"></i><span>Pesanan</span></a></li>
-    <li><a href="products.php"><i class="fas fa-utensils"></i><span>Produk</span></a></li>
-    <li><a href="categories.php"><i class="fas fa-tags"></i><span>Kategori</span></a></li>
-    <li><a href="customers.php" class="<?= ($currentPage ?? '') == 'customers.php' ? 'active' : '' ?>"><i class="fas fa-users"></i><span>Pelanggan</span></a></li>
-    
-    <!-- ✅ MENU BARU: Kelola Gambar -->
-    <li><a href="manage-images.php" class="<?= ($currentPage ?? '') == 'manage-images.php' ? 'active' : '' ?>"><i class="fas fa-images"></i><span>Kelola Gambar</span></a></li>
-    
-    <li><a href="admin_topping.php" class="<?= ($currentPage ?? '') == 'admin_topping.php' ? 'active' : '' ?>">
-    <i class="fas fa-pepper-hot"></i><span>Topping & Level</span>
-</a></li>
-<li>
-    <a href="admin_store_profile.php" class="<?= ($currentPage == 'admin_store_profile.php') ? 'active' : '' ?>">
-        <i class="fas fa-store"></i>
-        <span>Profil Toko</span>
-    </a>
-</li>
-    <li><a href="settings.php"><i class="fas fa-cog"></i><span>Pengaturan</span></a></li>
-</ul>
+    <ul class="sidebar-menu">
+        <li><a href="dashboard.php"><i class="fas fa-home"></i><span>Dashboard</span></a></li>
+        <li><a href="orders.php"><i class="fas fa-shopping-bag"></i><span>Pesanan</span></a></li>
+        <li><a href="products.php"><i class="fas fa-utensils"></i><span>Produk</span></a></li>
+        <li><a href="categories.php"><i class="fas fa-tags"></i><span>Kategori</span></a></li>
+        <li><a href="customers.php"><i class="fas fa-users"></i><span>Pelanggan</span></a></li>
+        <li><a href="manage-images.php"><i class="fas fa-images"></i><span>Kelola Gambar</span></a></li>
+        <li><a href="admin_topping.php"><i class="fas fa-pepper-hot"></i><span>Topping & Level</span></a></li>
+        <li><a href="admin_store_profile.php" class="active"><i class="fas fa-store"></i><span>Profil Toko</span></a></li>
+        <li><a href="settings.php"><i class="fas fa-cog"></i><span>Pengaturan</span></a></li>
+
+    </ul>
 </aside>
 
 <!-- Main Content -->

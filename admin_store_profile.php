@@ -1,10 +1,7 @@
 <?php
 require_once 'config.php'; // File ini sudah memanggil session_start() di dalamnya
 
-// HAPUS ATAU KOMENTARI BARIS INI KARENA SUDAH ADA DI CONFIG.PHP
-// session_start(); 
-
-// Cek apakah user adalah admin (sesuaikan dengan sistem login Anda)
+// Cek apakah user adalah admin
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
     header("Location: index.php");
     exit;
@@ -12,8 +9,6 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
 
 $msg = '';
 $msgType = 'success';
-
-// ... sisa kode lainnya ...
 
 // Ambil data profile saat ini
 $profile_query = mysqli_query($conn, "SELECT * FROM store_profile WHERE id=1 LIMIT 1");
@@ -39,6 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $opening_hours = mysqli_real_escape_string($conn, $_POST['opening_hours']);
     $latitude = mysqli_real_escape_string($conn, $_POST['latitude']);
     $longitude = mysqli_real_escape_string($conn, $_POST['longitude']);
+    $established_year = (int)$_POST['established_year'];
 
     // Upload Logo
     $logo_path = $profile['logo_path'];
@@ -51,7 +47,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $target_file = $target_dir . $new_filename;
         
         if (move_uploaded_file($_FILES['logo']['tmp_name'], $target_file)) {
-            // Hapus logo lama jika bukan default dan file ada
             if ($logo_path != 'assets/images/logo-texcer.png' && file_exists($logo_path)) {
                 unlink($logo_path);
             }
@@ -70,7 +65,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $target_file = $target_dir . $new_filename;
         
         if (move_uploaded_file($_FILES['cover']['tmp_name'], $target_file)) {
-            // Hapus cover lama jika bukan default dan file ada
             if ($cover_path != 'assets/images/cover-texcer.jpg' && file_exists($cover_path)) {
                 unlink($cover_path);
             }
@@ -92,13 +86,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             tiktok='$tiktok', 
             opening_hours='$opening_hours', 
             latitude='$latitude', 
-            longitude='$longitude' 
+            longitude='$longitude',
+            established_year='$established_year'
             WHERE id=1";
 
     if (mysqli_query($conn, $sql)) {
         $msg = "✅ Profil toko berhasil diperbarui!";
         $msgType = "success";
-        // Refresh data untuk preview langsung
         $profile_query = mysqli_query($conn, "SELECT * FROM store_profile WHERE id=1 LIMIT 1");
         $profile = mysqli_fetch_assoc($profile_query);
     } else {
@@ -118,21 +112,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     
     <style>
+        /* =========================================
+           THEME COLORS BASED ON SCREENSHOT
+           ========================================= */
+        :root {
+            --primary-color: #8d6e63; /* Coklat Bronze/Kopi */
+            --primary-hover: #6d4c41;
+            --bg-body: #f4f4f4;       /* Abu-abu muda background utama */
+            --bg-sidebar: #ffffff;    /* Sidebar Putih */
+            --text-main: #333333;
+            --text-muted: #666666;
+            --border-color: #e0e0e0;
+        }
+
         /* RESET & BASE */
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             font-family: 'Plus Jakarta Sans', sans-serif;
-            background: #f7f3ee; /* Warna background dashboard */
-            color: #1a0f00;
+            background: var(--bg-body);
+            color: var(--text-main);
             display: flex;
             min-height: 100vh;
         }
 
-        /* SIDEBAR STYLES (Sama seperti dashboard lain) */
+        /* SIDEBAR STYLES (White Sidebar like Dashboard) */
         .sidebar {
-            width: 250px;
-            background: #3D2914; /* Coklat Tua */
-            color: white;
+            width: 260px;
+            background: var(--bg-sidebar);
+            color: var(--text-main);
             flex-shrink: 0;
             display: flex;
             flex-direction: column;
@@ -141,130 +148,149 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             left: 0;
             top: 0;
             z-index: 100;
-            transition: all 0.3s;
+            border-right: 1px solid var(--border-color);
+            box-shadow: 2px 0 10px rgba(0,0,0,0.02);
         }
         .sidebar-header {
-            padding: 20px;
-            font-size: 1.2rem;
-            font-weight: 700;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding: 25px 20px;
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: var(--primary-color);
             display: flex;
             align-items: center;
             gap: 10px;
         }
         .sidebar-menu {
             list-style: none;
-            padding: 20px 0;
+            padding: 10px 0;
             flex-grow: 1;
         }
         .sidebar-menu li a {
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 12px 20px;
-            color: rgba(255,255,255,0.7);
+            gap: 15px;
+            padding: 14px 25px;
+            color: var(--text-muted);
             text-decoration: none;
-            transition: all 0.3s;
+            transition: all 0.2s ease;
             font-weight: 500;
+            font-size: 15px;
+            border-left: 4px solid transparent;
         }
-        .sidebar-menu li a:hover, .sidebar-menu li a.active {
-            background: rgba(255,255,255,0.1);
-            color: white;
-            border-left: 4px solid #D4A574; /* Aksen Emas */
+        .sidebar-menu li a:hover {
+            background: #f9f9f9;
+            color: var(--primary-color);
+        }
+        .sidebar-menu li a.active {
+            background: #fdfbf7;
+            color: var(--primary-color);
+            border-left: 4px solid var(--primary-color);
+            font-weight: 600;
         }
         .sidebar-menu li a i {
             width: 20px;
             text-align: center;
+            font-size: 16px;
         }
 
         /* MAIN CONTENT WRAPPER */
         .main-content {
-            margin-left: 250px;
+            margin-left: 260px;
             flex-grow: 1;
-            padding: 28px;
+            padding: 30px;
         }
 
-        /* CARD & FORM STYLES */
+        /* HEADER AREA */
         .wrap { max-width: 1100px; margin: 0 auto; }
         
         h2.page-title {
-            font-size: 1.5rem;
+            font-size: 24px;
             font-weight: 700;
-            color: #3D2914;
+            color: #4a3b2a;
             margin-bottom: 24px;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e6e6e6;
         }
 
+        /* CARD STYLES */
         .card {
             background: #fff;
             border-radius: 12px;
-            padding: 24px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            margin-bottom: 24px;
-            border: 1px solid #ede8e0;
+            padding: 25px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+            margin-bottom: 25px;
+            border: 1px solid #eee;
         }
 
         .card h3 {
-            font-size: 1.1rem;
+            font-size: 18px;
             font-weight: 700;
-            color: #8B6F4E; /* Coklat Primer */
+            color: #4a3b2a;
             margin-bottom: 20px;
-            border-bottom: 1px solid #f0ebe3;
+            border-bottom: 1px solid #f0f0f0;
             padding-bottom: 10px;
         }
 
-        .form-group { margin-bottom: 16px; }
+        /* FORM ELEMENTS */
+        .form-group { margin-bottom: 18px; }
         
         .form-label {
             font-weight: 600;
-            color: #3D2914;
+            color: #555;
             display: block;
             margin-bottom: 8px;
-            font-size: 0.9rem;
+            font-size: 14px;
         }
 
         .form-control {
             width: 100%;
-            padding: 10px 14px;
-            border: 1.5px solid #E8DDD4;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
             border-radius: 8px;
             font-family: inherit;
-            font-size: 0.95rem;
-            background: #fafaf8;
+            font-size: 14px;
+            background: #fafafa;
             transition: border-color 0.2s;
+            color: #333;
         }
         .form-control:focus {
             outline: none;
-            border-color: #8B6F4E;
+            border-color: var(--primary-color);
             background: #fff;
         }
 
         textarea.form-control { resize: vertical; min-height: 100px; }
 
+        /* BUTTONS */
         .btn-primary {
-            background: #8B6F4E;
+            background: var(--primary-color);
             color: white;
             border: none;
             padding: 12px 24px;
             border-radius: 8px;
             cursor: pointer;
             font-weight: 600;
-            font-size: 1rem;
+            font-size: 15px;
             transition: background 0.2s;
             display: inline-flex;
             align-items: center;
             gap: 8px;
+            box-shadow: 0 4px 6px rgba(141, 110, 99, 0.2);
         }
-        .btn-primary:hover { background: #6B5637; }
+        .btn-primary:hover { 
+            background: var(--primary-hover); 
+            transform: translateY(-1px);
+        }
 
         /* Image Preview Styles */
         .preview-container {
             margin-bottom: 10px;
             overflow: hidden;
             border-radius: 8px;
-            border: 1px solid #ddd;
+            border: 1px solid #eee;
             background: #f9f9f9;
         }
         .preview-cover {
@@ -279,6 +305,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             object-fit: contain;
             display: block;
             margin: 0 auto;
+            padding: 10px;
         }
 
         /* Alert Messages */
@@ -286,13 +313,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             padding: 12px 16px;
             border-radius: 8px;
             margin-bottom: 20px;
-            font-size: 0.9rem;
+            font-size: 14px;
             font-weight: 500;
             display: flex;
             align-items: center;
             gap: 10px;
         }
-        .alert-success { background: #e8f5e9; color: #1b5e20; border: 1px solid #c8e6c9; }
+        .alert-success { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
         .alert-error { background: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
 
         /* Responsive Sidebar */
@@ -301,6 +328,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             .sidebar-header span, .sidebar-menu li a span { display: none; }
             .main-content { margin-left: 70px; padding: 15px; }
             .sidebar-menu li a { justify-content: center; padding: 15px 0; }
+            .sidebar-header { justify-content: center; padding: 20px 0; }
         }
     </style>
 </head>
@@ -310,7 +338,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <div class="sidebar">
     <div class="sidebar-header">
         <i class="fas fa-pepper-hot"></i>
-        <span>Texcer Admin</span>
+        <span>Texcer Hot</span>
     </div>
     <ul class="sidebar-menu">
         <li><a href="dashboard.php"><i class="fas fa-home"></i><span>Dashboard</span></a></li>
@@ -322,7 +350,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <li><a href="admin_topping.php"><i class="fas fa-pepper-hot"></i><span>Topping & Level</span></a></li>
         <li><a href="admin_store_profile.php" class="active"><i class="fas fa-store"></i><span>Profil Toko</span></a></li>
         <li><a href="settings.php"><i class="fas fa-cog"></i><span>Pengaturan</span></a></li>
-        <li style="margin-top: auto;"><a href="../index.php" target="_blank"><i class="fas fa-external-link-alt"></i><span>Lihat Toko</span></a></li>
     </ul>
 </div>
 
@@ -331,7 +358,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="wrap">
         
         <h2 class="page-title">
-            <i class="fas fa-pencil-alt" style="color: #8B6F4E;"></i> Edit Profil Toko
+            <i class="fas fa-pencil-alt" style="color: var(--primary-color);"></i> Edit Profil Toko
         </h2>
 
         <?php if ($msg): ?>
@@ -352,7 +379,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <img src="<?= htmlspecialchars($profile['cover_path']) ?>" class="preview-cover" alt="Cover Preview" onerror="this.src='https://via.placeholder.com/1200x400?text=No+Cover'">
                     </div>
                     <input type="file" name="cover" class="form-control" accept="image/*">
-                    <small style="color: #666; font-size: 0.8rem;">Rekomendasi ukuran: 1200x400 px</small>
+                    <small style="color: #888; font-size: 12px;">Rekomendasi ukuran: 1200x400 px</small>
                 </div>
 
                 <div class="form-group">
@@ -361,7 +388,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <img src="<?= htmlspecialchars($profile['logo_path']) ?>" class="preview-img" alt="Logo Preview" onerror="this.src='https://via.placeholder.com/150?text=No+Logo'">
                     </div>
                     <input type="file" name="logo" class="form-control" accept="image/*">
-                    <small style="color: #666; font-size: 0.8rem;">Rekomendasi ukuran: 200x200 px (Persegi)</small>
+                    <small style="color: #888; font-size: 12px;">Rekomendasi ukuran: 200x200 px (Persegi)</small>
                 </div>
             </div>
 
@@ -392,7 +419,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <!-- Bagian Lokasi & Kontak -->
             <div class="card">
-                <h3>📍 Lokasi & Kontak</h3>
+                <h3> Lokasi & Kontak</h3>
                 
                 <div class="form-group">
                     <label class="form-label">Alamat Lengkap</label>

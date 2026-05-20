@@ -1,94 +1,14 @@
 <?php 
-session_start(); // Pastikan session dimulai
 include 'config.php'; 
-
-// ==========================================
-// KONFIGURASI NOMOR WHATSAPP ADMIN
-// ==========================================
-$ADMIN_WA_NUMBER = '62895618033060'; // Nomor Admin Texcer Hot
-
-// Fungsi Helper untuk membersihkan nomor HP format Indonesia
-function cleanPhoneNumber($phone) {
-    $phone = preg_replace('/[^0-9]/', '', $phone);
-    if (substr($phone, 0, 1) == '0') {
-        $phone = '62' . substr($phone, 1);
-    }
-    return $phone;
-}
-
-// Fungsi Kirim Notifikasi WhatsApp
-function sendWhatsAppNotification($phone, $message) {
-    $cleanPhone = cleanPhoneNumber($phone);
-    $encodedMessage = urlencode($message);
-    
-    // OPSI 1: Menggunakan API Gateway (Contoh: Fonnte, Wablas)
-    // Uncomment dan isi Token jika punya API agar notifikasi otomatis terkirim
-    /*
-    $curl = curl_init();
-    curl_setopt_array($curl, array(
-        CURLOPT_URL => 'https://api.fonnte.com/send', 
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POSTFIELDS => array(
-            'target' => $cleanPhone,
-            'message' => urldecode($encodedMessage),
-        ),
-        CURLOPT_HTTPHEADER => array(
-            'Authorization: TOKEN_API_ANDA_DISINI' 
-        ),
-    ));
-    $response = curl_exec($curl);
-    curl_close($curl);
-    return $response;
-    */
-
-    // OPSI 2: Fallback (Kosongkan jika tidak ada API, notifikasi hanya tercatat di log/server)
-    return true;
-}
-
-// Fungsi Notifikasi Order Created
-function notifyOrderCreated($conn, $phone, $order_id, $order_number, $total, $items, $address) {
-    global $ADMIN_WA_NUMBER;
-
-    // 1. Format Rincian Item
-    $itemList = "";
-    foreach($items as $item) {
-        $variant = !empty($item['variant']) ? " ({$item['variant']})" : "";
-        $itemList .= "- {$item['name']}{$variant} x{$item['qty']}\n";
-    }
-
-    // 2. Pesan untuk ADMIN
-    $adminMessage = "🔔 *PESANAN BARU MASUK!*\n\n"
-                  . "No Order: #{$order_number}\n"
-                  . "Nama: {$items[0]['customer_name']}\n"
-                  . "HP: {$phone}\n"
-                  . "Alamat: {$address}\n\n"
-                  . "*Rincian Pesanan:*\n"
-                  . "{$itemList}\n"
-                  . "*Total Bayar: Rp " . number_format($total, 0, ',', '.') . "*\n"
-                  . "Metode: COD\n\n"
-                  . "Mohon segera diproses.";
-    
-    sendWhatsAppNotification($ADMIN_WA_NUMBER, $adminMessage);
-
-    // 3. Pesan untuk PEMBELI
-    $buyerMessage = "Terima kasih! 🙏\n\n"
-                  . "Pesanan Anda telah dibuat.\n"
-                  . "No Order: #{$order_number}\n\n"
-                  . "*Siapkan dana sebesar Rp " . number_format($total, 0, ',', '.') . "*\n"
-                  . "untuk pembayaran COD saat pesanan diterima.\n\n"
-                  . "Kami akan segera memproses pesanan Anda. Terima kasih telah berbelanja di Texcer Hot! 🌶️";
-    
-    sendWhatsAppNotification($phone, $buyerMessage);
-}
+include 'functions.php';
 
 $grand_total = 0;
 $total_items = 0;
 
-// 1. Logika Update Quantity, Hapus, & GANTI VARIAN
+// 1. Logika Update Quantity & Hapus
 if(isset($_GET['action'])){
     $index = $_GET['index'];
     $action = $_GET['action'];
-    
     if(isset($_SESSION['cart'][$index])){
         if($action == 'plus'){
             $_SESSION['cart'][$index]['qty']++;
@@ -102,17 +22,25 @@ if(isset($_GET['action'])){
         } elseif($action == 'remove'){
             unset($_SESSION['cart'][$index]);
             $_SESSION['cart'] = array_values($_SESSION['cart']);
-        } elseif($action == 'change_variant'){
-            // Logika Ganti Varian
-            $newVariant = isset($_GET['variant']) ? $_GET['variant'] : 'Regular';
-            $_SESSION['cart'][$index]['variant'] = $newVariant;
         }
     }
     header("Location: checkout.php");
     exit;
 }
 
-// 2. Logika Checkout (HANYA COD)
+// 2. Upload QRIS Image
+if(isset($_POST['upload_qris'])){
+    if(isset($_FILES['qris_image']) && $_FILES['qris_image']['error'] == 0){
+        $target_dir = "assets/images/";
+        $target_file = $target_dir . "qris_" . time() . ".jpg";
+        if(move_uploaded_file($_FILES['qris_image']['tmp_name'], $target_file)){
+            $_SESSION['qris_image'] = $target_file;
+            echo "<script>alert('QRIS berhasil diupload!'); window.location='checkout.php';</script>";
+        }
+    }
+}
+
+// 3. Logika Checkout
 if(isset($_POST['process_order'])){
     $name = $_POST['cust_name'];
     $phone = $_POST['cust_phone'];
@@ -120,60 +48,36 @@ if(isset($_POST['process_order'])){
     $address = $_POST['cust_address'];
     $city = $_POST['cust_city'];
     $province = $_POST['cust_province'];
-    
-    $payment_method = 'COD'; 
-    
+    $payment_method = $_POST['payment_method'] ?? 'COD';
     $notes = $_POST['notes'];
     $total = 0;
-    
     if(!empty($_SESSION['cart'])){
-        foreach($_SESSION['cart'] as $item) $total += ((float)$item['price'] * (int)$item['qty']);
-        
+        foreach($_SESSION['cart'] as $item) $total += ($item['price'] * $item['qty']);
         $sql_order = "INSERT INTO orders (customer_name, customer_phone, customer_address, customer_city, customer_province, total_price, status, payment_method) 
-                      VALUES ('$name', '$phone', '$address', '$city', '$province', '$total', 'Menunggu Konfirmasi', '$payment_method')";
-        
+                      VALUES ('$name', '$phone', '$address', '$city', '$province', '$total', 'Pending', '$payment_method')";
         if(mysqli_query($conn, $sql_order)){
             $order_id = mysqli_insert_id($conn);
             $order_number = 'ORD' . str_pad($order_id, 10, '0', STR_PAD_LEFT);
             mysqli_query($conn, "UPDATE orders SET order_number = '$order_number' WHERE id = $order_id");
-            
-            $itemsForNotif = [];
+            notifyOrderCreated($conn, $phone, $order_id, $order_number);
             foreach($_SESSION['cart'] as $item){
-                $sub = (float)$item['price'] * (int)$item['qty'];
-                $variant = isset($item['variant']) ? $item['variant'] : 'Regular';
-                $image   = isset($item['image']) ? $item['image'] : '';
-                
-                mysqli_query($conn, "INSERT INTO order_items (order_id, product_name, price, qty, subtotal, variant, image) 
-                VALUES ('$order_id', '{$item['name']}', '{$item['price']}', '{$item['qty']}', '$sub', '$variant', '$image')");
-                
-                $itemsForNotif[] = [
-                    'name' => $item['name'],
-                    'variant' => $variant,
-                    'qty' => $item['qty'],
-                    'customer_name' => $name,
-                    'customer_address' => $address
-                ];
+                $sub = $item['price'] * $item['qty'];
+                mysqli_query($conn, "INSERT INTO order_items (order_id, product_name, price, qty, subtotal) VALUES ('$order_id', '{$item['name']}', '{$item['price']}', '{$item['qty']}', '$sub')");
             }
-            
-            notifyOrderCreated($conn, $phone, $order_id, $order_number, $total, $itemsForNotif, $address);
-            
             unset($_SESSION['cart']);
-            header("Location: checkout.php?success=1&oid={$order_id}&total={$total}");
+            header("Location: checkout.php?success=1");
             exit;
         }
     }
 }
 
 if(isset($_GET['success']) && $_GET['success'] == '1'){
-    $oid = $_GET['oid'] ?? '';
-    $total = $_GET['total'] ?? 0;
-    
     echo "<script src='https://cdn.jsdelivr.net/npm/sweetalert2@11'></script>
     <script>
     Swal.fire({
         icon: 'success',
         title: '🎉 Pesanan Berhasil!',
-        text: 'Terima kasih! Pesanan No: {$oid} telah dibuat. Siapkan dana Rp " . number_format($total, 0, ',', '.') . " untuk COD.',
+        text: 'Selamat! Pesanan Anda telah berhasil dibuat.',
         confirmButtonColor: '#8B6F4E',
         confirmButtonText: 'Lihat Pesanan'
     }).then((result) => {
@@ -191,6 +95,7 @@ if(!empty($addr_phone)){
 $default_addr = !empty($addresses) ? $addresses[0] : null;
 $currentPage = basename($_SERVER['PHP_SELF']);
 
+// Hitung notifikasi
 $totalNotifications = 0;
 if(isset($_SESSION['user_phone'])){
     $ph = $_SESSION['user_phone'];
@@ -200,8 +105,8 @@ if(isset($_SESSION['user_phone'])){
 
 if(!empty($_SESSION['cart'])){
     foreach($_SESSION['cart'] as $item){
-        $grand_total += ((float)$item['price'] * (int)$item['qty']);
-        $total_items += (int)$item['qty'];
+        $grand_total += ($item['price'] * $item['qty']);
+        $total_items += $item['qty'];
     }
 }
 ?>
@@ -224,6 +129,8 @@ if(!empty($_SESSION['cart'])){
     --text-dark: #3D2914;
     --text-gray: #8B7355;
     --border: #E8DDD4;
+    --red: #EE4D2D;
+    --red-light: #fff0ee;
     --green: #26aa99;
 }
 
@@ -236,7 +143,7 @@ body {
     min-height: 100vh;
 }
 
-/* Top Nav */
+/* ── TOP NAV (index.php style) ── */
 .top-nav {
     background: var(--bg-white);
     padding: 20px 40px;
@@ -285,6 +192,16 @@ body {
     text-decoration: none;
 }
 .nav-icons a:hover { color: var(--primary); }
+.nav-icon-btn {
+    background: none;
+    border: none;
+    color: var(--text-dark);
+    font-size: 1.2rem;
+    cursor: pointer;
+    position: relative;
+    transition: color 0.3s;
+}
+.nav-icon-btn:hover { color: var(--primary); }
 .cart-badge-nav, .notif-count {
     position: absolute;
     top: -8px;
@@ -302,7 +219,7 @@ body {
 }
 .notif-count { background: #dc3545; }
 
-/* Page Header */
+/* ── PAGE HEADER ── */
 .page-header {
     background: var(--bg-white);
     border-bottom: 1px solid var(--border);
@@ -343,14 +260,14 @@ body {
 .page-edit { font-size: 0.88rem; color: var(--primary); font-weight: 600; cursor: pointer; text-decoration: none; }
 .page-edit:hover { color: var(--primary-dark); }
 
-/* Main Layout */
+/* ── MAIN LAYOUT ── */
 .cart-layout {
     max-width: 900px;
     margin: 0 auto;
     padding: 12px 16px 120px;
 }
 
-/* Shop Group */
+/* ── SHOP GROUP ── */
 .shop-group {
     background: var(--bg-white);
     border-radius: 0;
@@ -394,7 +311,30 @@ body {
 .shop-name-link:hover { color: var(--primary); }
 .shop-name-link i { font-size: 0.75rem; color: var(--text-gray); }
 
-/* Cart Item */
+/* Promo strip */
+.promo-strip {
+    padding: 8px 16px;
+    background: #fff5f5;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid #fde8e3;
+    cursor: pointer;
+    transition: background .15s;
+}
+.promo-strip:hover { background: #fde8e3; }
+.promo-strip-left {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 0.82rem;
+    color: var(--primary);
+    font-weight: 500;
+}
+.promo-strip i.tag { color: var(--primary); font-size: 0.85rem; }
+.promo-strip i.chev { color: var(--text-gray); font-size: 0.78rem; }
+
+/* ── CART ITEM ── */
 .cart-item {
     padding: 14px 16px;
     display: flex;
@@ -402,7 +342,6 @@ body {
     align-items: flex-start;
     border-bottom: 1px solid #f5f0eb;
     transition: background .15s;
-    position: relative; /* Untuk posisi tombol hapus jika perlu */
 }
 .cart-item:last-child { border-bottom: none; }
 .cart-item:hover { background: #fdfaf7; }
@@ -416,8 +355,7 @@ body {
     margin-top: 30px;
 }
 
-/* Style Baru untuk Gambar Klikable */
-.item-image-wrapper {
+.item-image {
     width: 110px;
     height: 110px;
     border-radius: 6px;
@@ -427,31 +365,13 @@ body {
     border: 1px solid var(--border);
     cursor: pointer;
     transition: transform .2s;
-    position: relative;
 }
-.item-image-wrapper:hover { 
-    transform: scale(1.03); 
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-}
-.item-image-wrapper img {
+.item-image:hover { transform: scale(1.03); }
+.item-image img {
     width: 100%;
     height: 100%;
     object-fit: cover;
 }
-.zoom-hint {
-    position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(0,0,0,0.6);
-    color: white;
-    width: 30px; height: 30px;
-    border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    opacity: 0;
-    transition: opacity 0.2s;
-}
-.item-image-wrapper:hover .zoom-hint { opacity: 1; }
-
 .item-image-placeholder {
     width: 110px;
     height: 110px;
@@ -469,6 +389,7 @@ body {
 
 .item-body { flex: 1; min-width: 0; }
 
+/* Pre-order badge */
 .preorder-tag {
     display: inline-block;
     background: #222;
@@ -492,25 +413,47 @@ body {
     -webkit-box-orient: vertical;
 }
 
-/* Style Baru untuk Dropdown Varian */
-.variant-select {
+/* Variant dropdown-style badge */
+.variant-pill {
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    background: #fff;
+    background: #f5f0eb;
     border: 1px solid var(--border);
     border-radius: 4px;
-    padding: 4px 8px;
+    padding: 4px 10px;
     font-size: 0.8rem;
     color: var(--text-dark);
     margin-bottom: 8px;
     cursor: pointer;
-    outline: none;
+    transition: border-color .2s;
 }
-.variant-select:focus { border-color: var(--primary); }
-.variant-select option { padding: 5px; }
+.variant-pill:hover { border-color: var(--primary); }
+.variant-pill i { font-size: 0.72rem; color: var(--text-gray); }
 
-/* Price row - Cleaned up */
+/* Flash sale tag */
+.flash-sale-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--red);
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 4px;
+    margin-bottom: 6px;
+}
+.flash-sale-countdown {
+    background: rgba(255,255,255,0.25);
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 0.72rem;
+    font-family: monospace;
+    font-weight: 800;
+}
+
+/* Price row */
 .item-price-row {
     display: flex;
     align-items: center;
@@ -521,16 +464,41 @@ body {
 .item-price {
     font-size: 1.05rem;
     font-weight: 800;
-    color: var(--primary);
+    color: var(--red);
+}
+.item-original-price {
+    font-size: 0.82rem;
+    color: #aaa;
+    text-decoration: line-through;
+}
+.discount-badge {
+    background: var(--red-light);
+    color: var(--red);
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 3px;
 }
 
+/* Sold count */
 .sold-count {
     font-size: 0.78rem;
     color: var(--text-gray);
     margin-bottom: 4px;
 }
 
-/* Qty Control */
+/* Bonus line */
+.bonus-line {
+    font-size: 0.78rem;
+    color: #c87533;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-bottom: 8px;
+}
+.bonus-line i { font-size: 0.75rem; }
+
+/* ── QTY CONTROL ── */
 .qty-row {
     display: flex;
     align-items: center;
@@ -575,13 +543,43 @@ body {
     justify-content: center;
 }
 
-/* Empty Cart */
+/* ── VOUCHER STRIP ── */
+.voucher-strip {
+    background: var(--bg-white);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: background .15s;
+}
+.voucher-strip:hover { background: var(--bg-cream); }
+.voucher-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-dark);
+}
+.voucher-icon {
+    width: 32px;
+    height: 32px;
+    background: var(--red);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 0.85rem;
+}
+
+/* ── EMPTY CART ── */
 .empty-cart {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: center !important;
-    justify-content: center !important;
-    text-align: center !important;
+    text-align: center;
     padding: 80px 20px;
     background: var(--bg-white);
     margin: 20px 0;
@@ -590,7 +588,6 @@ body {
 .empty-cart i { font-size: 5rem; color: var(--primary); opacity: .2; margin-bottom: 20px; }
 .empty-cart h3 { font-size: 1.2rem; font-weight: 700; color: var(--text-dark); margin-bottom: 8px; }
 .empty-cart p  { color: var(--text-gray); margin-bottom: 24px; }
-
 .btn-shop {
     background: var(--primary);
     color: white;
@@ -600,17 +597,12 @@ body {
     font-weight: 700;
     cursor: pointer;
     text-decoration: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
+    display: inline-block;
     transition: all .2s;
-    margin: 0 auto;
 }
-
 .btn-shop:hover { background: var(--primary-dark); color: white; transform: translateY(-2px); }
 
-/* Bottom Bar */
+/* ── BOTTOM BAR ── */
 .bottom-bar {
     position: fixed;
     bottom: 0;
@@ -674,7 +666,7 @@ body {
 .checkout-btn:hover { background: #1e9486; transform: translateY(-1px); }
 .checkout-btn:disabled { background: #ccc; cursor: not-allowed; transform: none; }
 
-/* Modal Checkout */
+/* ── MODAL CHECKOUT ── */
 .modal-content {
     background: var(--bg-white);
     border: none;
@@ -794,14 +786,14 @@ body {
 }
 .btn-submit-order:hover { background: var(--primary-dark); transform: translateY(-2px); }
 
-/* Responsive */
+/* ── RESPONSIVE ── */
 @media (max-width: 992px) {
     .nav-menu { display: none; }
     .top-nav { padding: 14px 20px; }
     .page-header { top: 58px; }
 }
 @media (max-width: 600px) {
-    .item-image-wrapper, .item-image-placeholder { width: 90px; height: 90px; }
+    .item-image, .item-image-placeholder { width: 90px; height: 90px; }
     .checkout-btn { padding: 12px 20px; min-width: 100px; }
     .bottom-bar-right { gap: 12px; }
 }
@@ -809,7 +801,7 @@ body {
 </head>
 <body>
 
-<!-- Top Nav -->
+<!-- ── TOP NAV (index.php style) ── -->
 <nav class="top-nav">
     <div class="nav-container">
         <a href="index.php" class="logo">Texcer Hot</a>
@@ -819,6 +811,12 @@ body {
             <li><a href="riwayat.php">Pesanan</a></li>
         </ul>
         <div class="nav-icons">
+            <button class="nav-icon-btn" onclick="alert('Fitur notifikasi akan segera hadir!')">
+                <i class="fas fa-bell"></i>
+                <?php if($totalNotifications > 0): ?>
+                <span class="notif-count"><?= $totalNotifications ?></span>
+                <?php endif; ?>
+            </button>
             <a href="checkout.php">
                 <i class="fas fa-shopping-bag"></i>
                 <?php if(isset($_SESSION['cart']) && count($_SESSION['cart']) > 0): ?>
@@ -834,7 +832,7 @@ body {
     </div>
 </nav>
 
-<!-- Page Header -->
+<!-- ── PAGE HEADER ── -->
 <div class="page-header">
     <div class="page-header-inner">
         <div>
@@ -855,12 +853,19 @@ body {
     </div>
 </div>
 
-<!-- Main Content -->
+<!-- ── MAIN CONTENT ── -->
 <div class="cart-layout">
 
 <?php if(!empty($_SESSION['cart'])): ?>
 
-    <!-- ✅ VOUCHER STRIP DIHAPUS -->
+    <!-- Voucher strip -->
+    <div class="voucher-strip" onclick="alert('Fitur voucher segera hadir!')">
+        <div class="voucher-left">
+            <div class="voucher-icon"><i class="fas fa-ticket-alt"></i></div>
+            Semua voucher
+        </div>
+        <i class="fas fa-chevron-right" style="color: var(--text-gray); font-size: 0.8rem;"></i>
+    </div>
 
     <!-- Shop Group -->
     <div class="shop-group">
@@ -874,32 +879,33 @@ body {
             </a>
         </div>
 
-        <!-- ✅ PROMO STRIP (BELI 3 DISKON) DIHAPUS -->
+        <!-- Promo Strip -->
+        <div class="promo-strip">
+            <div class="promo-strip-left">
+                <i class="fas fa-tag tag"></i>
+                Beli 3, diskon 5%
+            </div>
+            <i class="fas fa-chevron-right chev"></i>
+        </div>
 
         <!-- Cart Items -->
         <?php foreach($_SESSION['cart'] as $index => $item):
-            $itemPrice    = (float)$item['price'];
-            $itemQty      = (int)$item['qty'];
-            $subtotal     = $itemPrice * $itemQty;
-            $currentVariant = isset($item['variant']) ? $item['variant'] : 'Regular';
-            
-            // Daftar opsi varian (Hardcoded untuk contoh, bisa dinamis dari DB jika perlu)
-            $variants = ['Regular', 'Level 1', 'Level 2', 'Level 3', 'Level 4', 'Level 5', 'Large', 'Medium', 'Paket Nasi'];
+            $subtotal = $item['price'] * $item['qty'];
+            $originalPrice = $item['price'] * 1.25; // simulasi harga asli
+            $discount = 20;
         ?>
         <div class="cart-item" id="item-<?= $index ?>">
             <input type="checkbox" class="item-check item-checkbox" checked
                 onchange="updateTotal()" data-price="<?= $subtotal ?>">
 
-            <!-- ✅ GAMBAR KLIKABLE UNTUK DETAIL -->
             <?php if(!empty($item['image'])): ?>
-            <div class="item-image-wrapper" onclick="showDetailModal(<?= $index ?>)">
-                <img src="<?= htmlspecialchars($item['image']) ?>" alt="<?= htmlspecialchars($item['name']) ?>">
-                <div class="zoom-hint"><i class="fas fa-search-plus"></i></div>
+            <div class="item-image" onclick="window.location='index.php'">
+                <img src="<?= htmlspecialchars($item['image']) ?>"
+                     alt="<?= htmlspecialchars($item['name']) ?>"
+                     onerror="this.parentElement.innerHTML='<div style=\'display:flex;align-items:center;justify-content:center;height:100%;font-size:2rem;color:#8B6F4E;opacity:.4\'><i class=\'fas fa-utensils\'></i></div>'">
             </div>
             <?php else: ?>
-            <div class="item-image-placeholder" onclick="showDetailModal(<?= $index ?>)" style="cursor:pointer;">
-                <i class="fas fa-utensils"></i>
-            </div>
+            <div class="item-image-placeholder"><i class="fas fa-utensils"></i></div>
             <?php endif; ?>
 
             <div class="item-body">
@@ -909,30 +915,55 @@ body {
 
                 <div class="item-name"><?= htmlspecialchars($item['name']) ?></div>
 
-                <!-- ✅ DROPDOWN GANTI VARIAN -->
-                <select class="variant-select" onchange="changeVariant(<?= $index ?>, this.value)">
-                    <?php foreach($variants as $v): ?>
-                        <option value="<?= $v ?>" <?= ($currentVariant == $v) ? 'selected' : '' ?>><?= $v ?></option>
-                    <?php endforeach; ?>
-                </select>
+                <?php if(!empty($item['variant'])): ?>
+                <div class="variant-pill">
+                    <?= htmlspecialchars($item['variant']) ?>
+                    <i class="fas fa-chevron-down"></i>
+                </div>
+                <?php endif; ?>
+
+                <!-- Flash sale (only for first few items for demo) -->
+                <?php if($index < 2): ?>
+                <div class="flash-sale-tag">
+                    <i class="fas fa-bolt"></i>
+                    Flash Sale
+                    <span class="flash-sale-countdown" id="countdown-<?= $index ?>">--:--:--</span>
+                </div>
+                <?php endif; ?>
 
                 <div class="item-price-row">
-                    <span class="item-price">Rp<?= number_format($itemPrice, 0, ',', '.') ?></span>
+                    <span class="item-price">Rp<?= number_format($item['price'], 0, ',', '.') ?></span>
+                    <span class="item-original-price">Rp<?= number_format($originalPrice, 0, ',', '.') ?></span>
+                    <span class="discount-badge">-<?= $discount ?>%</span>
                 </div>
 
                 <div class="sold-count"><?= rand(5,50) ?> terjual kemarin</div>
+
+                <div class="bonus-line">
+                    <i class="fas fa-gift"></i>
+                    Dapatkan diskon 8% dengan bonus
+                </div>
 
                 <!-- Qty Control -->
                 <div class="qty-row">
                     <button class="qty-btn minus"
                         onclick="updateQty(<?= $index ?>, -1)"
                         title="Kurangi">−</button>
-                    <div class="qty-value" id="qty-<?= $index ?>"><?= $itemQty ?></div>
+                    <div class="qty-value" id="qty-<?= $index ?>"><?= $item['qty'] ?></div>
                     <button class="qty-btn plus"
                         onclick="updateQty(<?= $index ?>, 1)"
                         title="Tambah">+</button>
                 </div>
             </div>
+        </div>
+
+        <!-- Diskon voucher strip per item -->
+        <div class="promo-strip" style="padding-left: 48px;">
+            <div class="promo-strip-left" style="color: var(--text-gray);">
+                <i class="fas fa-ticket-alt tag" style="color: var(--red);"></i>
+                Diskon s.d. 4% dengan voucher
+            </div>
+            <i class="fas fa-chevron-right chev"></i>
         </div>
 
         <?php endforeach; ?>
@@ -947,7 +978,7 @@ body {
         <h3>Keranjang Kosong</h3>
         <p>Yuk, pesan makanan pedas favoritmu sekarang!</p>
         <a href="index.php" class="btn-shop">
-        Mulai Pesan
+            <i class="fas fa-fire me-2"></i>Mulai Pesan
         </a>
     </div>
 
@@ -955,7 +986,7 @@ body {
 
 </div>
 
-<!-- Bottom Bar -->
+<!-- ── BOTTOM BAR ── -->
 <div class="bottom-bar">
     <div class="bottom-bar-left">
         <input type="checkbox" class="select-all-check" id="selectAll" checked onchange="toggleSelectAll()">
@@ -978,7 +1009,7 @@ body {
     </div>
 </div>
 
-<!-- Modal Checkout -->
+<!-- ── MODAL CHECKOUT ── -->
 <div class="modal fade" id="checkoutModal" tabindex="-1">
     <div class="modal-dialog modal-fullscreen">
         <div class="modal-content">
@@ -1028,7 +1059,7 @@ body {
                     <input type="hidden" name="cust_city" id="final_city">
                     <input type="hidden" name="cust_province" id="final_province">
 
-                    <!-- Pembayaran (HANYA COD) -->
+                    <!-- Pembayaran -->
                     <div class="co-section">
                         <div class="co-section-title"><i class="fas fa-wallet"></i> Metode Pembayaran</div>
                         <div class="payment-card selected" onclick="selectPayment('cod', this)">
@@ -1043,6 +1074,29 @@ body {
                                 <input type="radio" name="payment_method" value="COD" checked style="accent-color:var(--primary);width:18px;height:18px;">
                             </div>
                         </div>
+                        <div class="payment-card" onclick="selectPayment('qris', this)">
+                            <div class="d-flex align-items-center gap-3">
+                                <div style="width:46px;height:46px;background:linear-gradient(135deg,#8B6F4E,#D4A574);border-radius:10px;display:flex;align-items:center;justify-content:center;color:white;font-size:1.3rem;">
+                                    <i class="fas fa-qrcode"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div style="font-weight:700;font-size:0.95rem;color:var(--text-dark);">QRIS</div>
+                                    <div style="font-size:0.8rem;color:var(--text-gray);">Scan QR Code untuk bayar</div>
+                                </div>
+                                <input type="radio" name="payment_method" value="QRIS" style="accent-color:var(--primary);width:18px;height:18px;">
+                            </div>
+                            <?php if(isset($_SESSION['qris_image'])): ?>
+                            <div class="text-center mt-3">
+                                <img src="<?= $_SESSION['qris_image'] ?>" alt="QRIS" style="max-width:180px;border:2px solid var(--primary);border-radius:8px;">
+                            </div>
+                            <?php else: ?>
+                            <div class="text-center mt-3 p-3" style="border:2px dashed var(--border);border-radius:8px;cursor:pointer;" onclick="document.getElementById('qrisInput').click()">
+                                <i class="fas fa-cloud-upload-alt fa-2x mb-2" style="color:var(--text-gray);"></i>
+                                <div style="font-size:0.82rem;color:var(--text-gray);">Klik untuk upload QRIS</div>
+                                <input type="file" id="qrisInput" name="qris_image" accept="image/*" style="display:none;" onchange="this.form.submit()">
+                            </div>
+                            <?php endif; ?>
+                        </div>
                     </div>
 
                     <!-- Catatan -->
@@ -1056,7 +1110,7 @@ body {
                     <div class="total-summary">
                         <div class="total-row">
                             <span class="label">Subtotal (<?= $total_items ?> item)</span>
-                            <span>Rp<?= number_format($grand_total, 0, ',', '.') ?></span>
+                            <span>Rp<?= number_format($grand_total ?? 0, 0, ',', '.') ?></span>
                         </div>
                         <div class="total-row">
                             <span class="label">Ongkir</span>
@@ -1064,7 +1118,7 @@ body {
                         </div>
                         <div class="total-row">
                             <span>Total Bayar</span>
-                            <span class="value-big">Rp<?= number_format($grand_total, 0, ',', '.') ?></span>
+                            <span class="value-big">Rp<?= number_format($grand_total ?? 0, 0, ',', '.') ?></span>
                         </div>
                     </div>
 
@@ -1079,91 +1133,20 @@ body {
     </div>
 </div>
 
-<!-- ✅ MODAL DETAIL PRODUK BARU -->
-<div class="modal fade" id="detailProductModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header border-0 pb-0">
-                <h5 class="modal-title">Detail Produk</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body text-center pt-0">
-                <img id="modalDetailImg" src="" class="img-fluid rounded mb-3" style="max-height: 250px; object-fit: contain;">
-                <h4 id="modalDetailName" class="mb-1"></h4>
-                <p id="modalDetailVariant" class="text-muted small mb-2"></p>
-                <h3 id="modalDetailPrice" class="text-primary fw-bold mb-3"></h3>
-                <div class="d-flex justify-content-center align-items-center gap-3 mb-4">
-                    <span class="fw-bold">Jumlah:</span>
-                    <span id="modalDetailQty" class="badge bg-secondary fs-6"></span>
-                </div>
-                <hr>
-                <button onclick="deleteFromModal()" class="btn btn-danger w-100">
-                    <i class="fas fa-trash me-2"></i>Hapus Item Ini
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-// Variabel global untuk menyimpan index item yang sedang dilihat di modal
-let currentDetailIndex = null;
-
-// QTY UPDATE
+// ── QTY UPDATE ──
 function updateQty(index, change) {
     window.location.href = `?action=${change > 0 ? 'plus' : 'minus'}&index=${index}`;
 }
 
-// ✅ FUNGSI GANTI VARIAN
-function changeVariant(index, newVariant) {
-    window.location.href = `?action=change_variant&index=${index}&variant=${encodeURIComponent(newVariant)}`;
-}
-
-// ✅ FUNGSI TAMPILKAN MODAL DETAIL
-function showDetailModal(index) {
-    currentDetailIndex = index;
-    
-    // Ambil data dari elemen HTML yang sudah ada
-    const itemRow = document.querySelectorAll('.cart-item')[index];
-    const imgSrc = itemRow.querySelector('.item-image-wrapper img')?.src || itemRow.querySelector('.item-image-placeholder') ? '' : '';
-    const name = itemRow.querySelector('.item-name').innerText;
-    const variant = itemRow.querySelector('.variant-select').value;
-    const price = itemRow.querySelector('.item-price').innerText;
-    const qty = itemRow.querySelector('.qty-value').innerText;
-    
-    // Jika placeholder, gunakan gambar default atau kosong
-    let finalImg = imgSrc;
-    if(itemRow.querySelector('.item-image-placeholder')) {
-        finalImg = 'assets/images/placeholder.png'; // Ganti dengan path placeholder Anda
-    }
-
-    document.getElementById('modalDetailImg').src = finalImg;
-    document.getElementById('modalDetailName').innerText = name;
-    document.getElementById('modalDetailVariant').innerText = "Varian: " + variant;
-    document.getElementById('modalDetailPrice').innerText = price;
-    document.getElementById('modalDetailQty').innerText = qty;
-    
-    const modal = new bootstrap.Modal(document.getElementById('detailProductModal'));
-    modal.show();
-}
-
-// ✅ FUNGSI HAPUS DARI MODAL
-function deleteFromModal() {
-    if(currentDetailIndex !== null) {
-        if(confirm('Yakin ingin menghapus item ini dari keranjang?')) {
-            window.location.href = `?action=remove&index=${currentDetailIndex}`;
-        }
-    }
-}
-
-// SHOW CHECKOUT MODAL
+// ── SHOW CHECKOUT MODAL ──
 function showCheckoutModal() {
     const modal = new bootstrap.Modal(document.getElementById('checkoutModal'));
     modal.show();
 }
 
-// SELECT ADDRESS
+// ── SELECT ADDRESS ──
 function selectAddress(index) {
     document.querySelectorAll('.address-card').forEach(el => el.classList.remove('selected'));
     const cards = document.querySelectorAll('.address-card');
@@ -1177,14 +1160,14 @@ function selectAddress(index) {
     }
 }
 
-// SELECT PAYMENT
+// ── SELECT PAYMENT ──
 function selectPayment(method, element) {
     document.querySelectorAll('.payment-card').forEach(el => el.classList.remove('selected'));
     element.classList.add('selected');
     element.querySelector('input[type="radio"]').checked = true;
 }
 
-// TOGGLE SHOP CHECKBOX
+// ── TOGGLE SHOP CHECKBOX ──
 function toggleShop(shopCheck) {
     document.querySelectorAll('.item-checkbox').forEach(cb => {
         cb.checked = shopCheck.checked;
@@ -1193,7 +1176,7 @@ function toggleShop(shopCheck) {
     updateTotal();
 }
 
-// TOGGLE SELECT ALL
+// ── TOGGLE SELECT ALL ──
 function toggleSelectAll() {
     const all = document.getElementById('selectAll').checked;
     document.querySelectorAll('.item-checkbox').forEach(cb => cb.checked = all);
@@ -1201,12 +1184,13 @@ function toggleSelectAll() {
     updateTotal();
 }
 
-// UPDATE TOTAL
+// ── UPDATE TOTAL ──
 function updateTotal() {
     let total = 0;
     let count = 0;
     document.querySelectorAll('.item-checkbox').forEach(cb => {
         if(cb.checked) {
+            // Get subtotal from data-price attribute (set at render time)
             total += parseInt(cb.dataset.price) || 0;
             count++;
         }
@@ -1217,16 +1201,92 @@ function updateTotal() {
     if(btn) btn.disabled = count === 0;
 }
 
-// INIT
+// ── FLASH SALE COUNTDOWN ──
+function startCountdown() {
+    // Set end time ~3 hours from now for demo
+    const endTime = new Date().getTime() + (3 * 60 * 60 * 1000);
+    setInterval(() => {
+        const now = new Date().getTime();
+        const diff = endTime - now;
+        if(diff <= 0) return;
+        const h = Math.floor(diff / (1000*60*60));
+        const m = Math.floor((diff % (1000*60*60)) / (1000*60));
+        const s = Math.floor((diff % (1000*60)) / 1000);
+        const str = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+        document.querySelectorAll('[id^="countdown-"]').forEach(el => el.textContent = str);
+    }, 1000);
+}
+
+// ==================== 🔥 FITUR TAMBAHAN TEXCER HOT ====================
+
+// 🔥 BELI SEKARANG: Tambah ke cart + langsung redirect ke checkout
+function buyNow(productId, variant = ''){
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = 'cart.php';
+    form.innerHTML = `
+        <input type="hidden" name="add_to_cart" value="1">
+        <input type="hidden" name="product_id" value="${productId}">
+        <input type="hidden" name="quantity" value="1">
+        <input type="hidden" name="variant" value="${variant}">
+        <input type="hidden" name="redirect" value="checkout">
+    `;
+    document.body.appendChild(form);
+    form.submit();
+}
+
+// 🛒 TAMBAH KE KERANJANG: Simpan produk ke session cart
+function addToCart(productId, variant = ''){
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = 'cart.php';
+    form.innerHTML = `
+        <input type="hidden" name="add_to_cart" value="1">
+        <input type="hidden" name="product_id" value="${productId}">
+        <input type="hidden" name="quantity" value="1">
+        <input type="hidden" name="variant" value="${variant}">
+    `;
+    document.body.appendChild(form);
+    form.submit();
+}
+
+// 💬 CHAT WHATSAPP: Buka WA dengan pesan otomatis
+function chatWhatsApp(productId = null, productName = ''){
+    const phone = '6281234567890'; // ⚠️ GANTI DENGAN NOMOR WA ASLI TEXCER HOT!
+    let message = 'Halo Texcer Hot 👋\n\n';
+    
+    if(productName){
+        message += `Saya tertarik dengan produk: *${productName}*\n`;
+        message += `Mohon info lebih lanjut.\n\n`;
+    } else {
+        message += `Saya ingin bertanya.\n\n`;
+    }
+    message += `Terima kasih! 🙏`;
+    
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+}
+
+// 🏪 INFO TOKO: Buka halaman about.php
+function showStoreInfo(){
+    window.location.href = 'about.php';
+}
+
+// ==================== END FITUR ====================
+
+// ── INIT ──
 document.addEventListener('DOMContentLoaded', () => {
+    // Auto-select default address
     const defaultAddr = document.querySelector('.address-card.selected');
     if(defaultAddr) {
         const idx = Array.from(document.querySelectorAll('.address-card')).indexOf(defaultAddr);
         selectAddress(idx);
     }
+    // Sync item checkboxes
     document.querySelectorAll('.item-checkbox').forEach(cb => {
         cb.addEventListener('change', updateTotal);
     });
+    startCountdown();
 });
 </script>
 </body>
