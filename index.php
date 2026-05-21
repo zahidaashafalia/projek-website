@@ -60,16 +60,34 @@ if(isset($_POST['update_status'])){
     exit;
 }
 
-// Logika Tambah ke Cart (Dengan Variant)
+// Logika Tambah ke Cart (Dengan Variant & GAMBAR)
 if(isset($_POST['add_to_cart'])){
-    $id = $_POST['id'];
+    $id = (int)$_POST['id'];
     $name = $_POST['name'];
     $price = $_POST['price'];
     $variant = $_POST['variant'] ?? '';
-    $cart_item = ['id' => $id, 'name' => $name, 'price' => $price, 'qty' => 1, 'variant' => $variant];
+    
+    // Ambil gambar langsung dari database
+    $productImage = '';
+    $img_query = mysqli_query($conn, "SELECT image FROM products WHERE id = $id LIMIT 1");
+    if($img_query && $img_row = mysqli_fetch_assoc($img_query)){
+        $productImage = !empty($img_row['image']) ? 'uploads/' . $img_row['image'] : '';
+    }
+
+    // 2. Buat item cart dengan menyertakan gambar
+    $cart_item = [
+        'id' => $id, 
+        'name' => $name, 
+        'price' => $price, 
+        'qty' => 1, 
+        'variant' => $variant,
+        'image' => $productImage // <-- PENTING: Simpan path gambar di sini
+    ];
+    
     $found = false;
     if(isset($_SESSION['cart'])){
         foreach($_SESSION['cart'] as $key => $item){
+            // Cek berdasarkan ID dan Varian
             if($item['id'] == $id && $item['variant'] == $variant){
                 $_SESSION['cart'][$key]['qty']++;
                 $found = true;
@@ -77,9 +95,11 @@ if(isset($_POST['add_to_cart'])){
             }
         }
     }
+    
     if(!$found){
         $_SESSION['cart'][] = $cart_item;
     }
+    
     // ✅ FIX: Jika "Beli Sekarang", langsung ke checkout
     if(isset($_POST['buy_now']) && $_POST['buy_now'] == '1'){
         header("Location: checkout.php");
@@ -1435,9 +1455,7 @@ body {
             
             <?php if($isAvail == 1): ?>
                 <!-- Jika Tersedia: Tombol Aktif -->
-                <button onclick="openVariantFromCard(<?= $p['id'] ?>, '<?= addslashes($p['name']) ?>', <?= $p['price'] ?>, '<?= $p['image'] ?>', '<?= strtolower($p['category']) ?>', '<?= htmlspecialchars(json_encode($p['levels']), ENT_QUOTES) ?>', '<?= htmlspecialchars(json_encode($p['toppings']), ENT_QUOTES) ?>')" style="background: var(--primary); color: white; border: none; padding: 6px 12px; border-radius: 15px; font-weight: 600; cursor: pointer; font-size: 0.8rem;">
-                    <i class="fas fa-cart-plus"></i> Tambah
-                </button>
+
             <?php else: ?>
                 <!-- Jika Tidak Tersedia: Tombol Disabled/Grey -->
                 <button disabled style="background: #ccc; color: #666; border: none; padding: 6px 12px; border-radius: 15px; font-weight: 600; cursor: not-allowed; font-size: 0.8rem;">
@@ -2285,6 +2303,7 @@ document.getElementById('trackingInput')?.addEventListener('keypress', function(
     <input type="hidden" name="price"   id="modal-product-price">
     <input type="hidden" name="variant" id="modal-product-variant" value="">
     <input type="hidden" name="buy_now" id="modal-buy-now" value="0">
+<input type="hidden" name="image"   id="modal-product-image" value="">
 </form>
 
 <div class="modal-footer" style="border-top: 1px solid #e0e0e0; padding: 12px 16px; background: white; position: sticky; bottom: 0; display: flex; align-items: center; gap: 8px;">
@@ -3578,6 +3597,7 @@ function omSubmit() {
     document.getElementById('modal-product-name').value = itemName; 
     document.getElementById('modal-product-price').value = pricePerItem; 
     document.getElementById('modal-product-variant').value = variantName;
+    document.getElementById('modal-product-image').value = omState.image || '';
     
     // Set Action Form ke index.php (karena logika add_to_cart ada di index.php)
     var form = document.getElementById('modalFormPesan');

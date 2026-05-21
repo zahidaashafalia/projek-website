@@ -13,12 +13,22 @@ if (isset($_GET['id'])) {
     if ($orderQuery && mysqli_num_rows($orderQuery) > 0) {
         $order = mysqli_fetch_assoc($orderQuery);
         
-        // Ambil data item pesanan
-        $itemsQuery = mysqli_query($conn, "SELECT * FROM order_items WHERE order_id = $id");
-        $items = [];
-        while ($item = mysqli_fetch_assoc($itemsQuery)) {
-            $items[] = $item;
-        }
+        // Ambil data item pesanan + gambar dari tabel products
+$itemsQuery = mysqli_query($conn, "
+    SELECT oi.*, p.image as product_image 
+    FROM order_items oi
+    LEFT JOIN products p ON p.name = SUBSTRING_INDEX(oi.product_name, ' (', 1)
+    WHERE oi.order_id = $id
+");
+$items = [];
+while ($item = mysqli_fetch_assoc($itemsQuery)) {
+    // Buat path gambar lengkap
+   // BARU:
+$item['image'] = !empty($item['product_image']) 
+    ? 'uploads/' . $item['product_image'] 
+    : '';
+    $items[] = $item;
+}
         
         $response = [
             'success' => true,

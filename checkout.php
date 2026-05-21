@@ -1,9 +1,29 @@
 <?php 
+// Mulai session jika belum ada
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 include 'config.php'; 
 include 'functions.php';
 
+// PERBAIKAN UTAMA: Inisialisasi cart jika belum ada untuk mencegah error "Undefined array key"
+if (!isset($_SESSION['cart'])) {
+    $_SESSION['cart'] = [];
+}
+
 $grand_total = 0;
 $total_items = 0;
+
+// --- TAMBAHKAN KODE INI DI BAWAH $total_items ---
+// Ambil Nomor WhatsApp Admin dari Database
+$wa_number = '62895618033060'; // Default
+$wa_res = mysqli_query($conn, "SELECT whatsapp_number FROM settings LIMIT 1");
+if($wa_res && $wa_row = mysqli_fetch_assoc($wa_res)){
+    $wa_number = preg_replace('/[^0-9]/', '', $wa_row['whatsapp_number']);
+    if(substr($wa_number, 0, 1) == '0') $wa_number = '62' . substr($wa_number, 1);
+}
+
 
 // 1. Logika Update Quantity & Hapus
 if(isset($_GET['action'])){
@@ -32,6 +52,9 @@ if(isset($_GET['action'])){
 if(isset($_POST['upload_qris'])){
     if(isset($_FILES['qris_image']) && $_FILES['qris_image']['error'] == 0){
         $target_dir = "assets/images/";
+        // Buat folder jika belum ada
+        if (!file_exists($target_dir)) { mkdir($target_dir, 0777, true); }
+        
         $target_file = $target_dir . "qris_" . time() . ".jpg";
         if(move_uploaded_file($_FILES['qris_image']['tmp_name'], $target_file)){
             $_SESSION['qris_image'] = $target_file;
@@ -42,6 +65,12 @@ if(isset($_POST['upload_qris'])){
 
 // 3. Logika Checkout
 if(isset($_POST['process_order'])){
+    // Validasi cart kosong
+    if(empty($_SESSION['cart'])){
+        echo "<script>alert('Keranjang belanja kosong!'); window.location='checkout.php';</script>";
+        exit;
+    }
+
     $name = $_POST['cust_name'];
     $phone = $_POST['cust_phone'];
     $_SESSION['user_phone'] = $phone;
@@ -50,23 +79,71 @@ if(isset($_POST['process_order'])){
     $province = $_POST['cust_province'];
     $payment_method = $_POST['payment_method'] ?? 'COD';
     $notes = $_POST['notes'];
+    
+    // Gunakan mysqli_real_escape_string untuk keamanan dasar jika fungsi helper tidak ada
+    if(function_exists('mysqli_real_escape_string')) {
+        $name = mysqli_real_escape_string($conn, $name);
+        $phone = mysqli_real_escape_string($conn, $phone);
+        $address = mysqli_real_escape_string($conn, $address);
+        $city = mysqli_real_escape_string($conn, $city);
+        $province = mysqli_real_escape_string($conn, $province);
+        $payment_method = mysqli_real_escape_string($conn, $payment_method);
+        $notes = mysqli_real_escape_string($conn, $notes);
+    }
+
     $total = 0;
     if(!empty($_SESSION['cart'])){
         foreach($_SESSION['cart'] as $item) $total += ($item['price'] * $item['qty']);
-        $sql_order = "INSERT INTO orders (customer_name, customer_phone, customer_address, customer_city, customer_province, total_price, status, payment_method) 
-                      VALUES ('$name', '$phone', '$address', '$city', '$province', '$total', 'Pending', '$payment_method')";
+        
+        $sql_order = "INSERT INTO orders (customer_name, customer_phone, customer_address, customer_city, customer_province, total_price, status, payment_method, notes) 
+                      VALUES ('$name', '$phone', '$address', '$city', '$province', '$total', 'Pending', '$payment_method', '$notes')";
+        
         if(mysqli_query($conn, $sql_order)){
             $order_id = mysqli_insert_id($conn);
             $order_number = 'ORD' . str_pad($order_id, 10, '0', STR_PAD_LEFT);
             mysqli_query($conn, "UPDATE orders SET order_number = '$order_number' WHERE id = $order_id");
-            notifyOrderCreated($conn, $phone, $order_id, $order_number);
-            foreach($_SESSION['cart'] as $item){
-                $sub = $item['price'] * $item['qty'];
-                mysqli_query($conn, "INSERT INTO order_items (order_id, product_name, price, qty, subtotal) VALUES ('$order_id', '{$item['name']}', '{$item['price']}', '{$item['qty']}', '$sub')");
+            
+            if(function_exists('notifyOrderCreated')){
+                notifyOrderCreated($conn, $phone, $order_id, $order_number);
             }
-            unset($_SESSION['cart']);
-            header("Location: checkout.php?success=1");
-            exit;
+
+            // Simpan item untuk WA SEBELUM cart di-unset
+$cart_items_for_wa = [];
+foreach($_SESSION['cart'] as $item){
+    $sub = $item['price'] * $item['qty'];
+    $prod_name = mysqli_real_escape_string($conn, $item['name']);
+    mysqli_query($conn, "INSERT INTO order_items (order_id, product_name, price, qty, subtotal) VALUES ('$order_id', '$prod_name', '{$item['price']}', '{$item['qty']}', '$sub')");
+    
+    // Simpan untuk session modal sukses
+    $cart_items_for_wa[] = [
+        'name'  => $item['name'],
+        'qty'   => $item['qty'],
+        'price' => $item['price'],
+        'sub'   => $sub
+    ];
+}
+
+// Simpan semua data ke session SEBELUM unset cart
+$_SESSION['last_order_id']       = $order_id;
+$_SESSION['last_order_number']   = $order_number;
+$_SESSION['last_order_total']    = $total;
+$_SESSION['last_order_notes']    = $notes;
+$_SESSION['last_order_name']     = $name;
+$_SESSION['last_order_phone']    = $phone;
+$_SESSION['last_order_address']  = $address;
+$_SESSION['last_order_city']     = $city;
+$_SESSION['last_order_province'] = $province;
+$_SESSION['last_order_items']    = $cart_items_for_wa;
+
+// Baru unset cart
+unset($_SESSION['cart']);
+$_SESSION['cart'] = [];
+
+session_write_close(); // Pastikan session tersimpan sebelum redirect
+header("Location: checkout.php?success=1");
+exit;
+        } else {
+            echo "<script>alert('Gagal memproses pesanan: " . mysqli_error($conn) . "');</script>";
         }
     }
 }
@@ -76,7 +153,7 @@ if(isset($_GET['success']) && $_GET['success'] == '1'){
     <script>
     Swal.fire({
         icon: 'success',
-        title: '🎉 Pesanan Berhasil!',
+        title: ' Pesanan Berhasil!',
         text: 'Selamat! Pesanan Anda telah berhasil dibuat.',
         confirmButtonColor: '#8B6F4E',
         confirmButtonText: 'Lihat Pesanan'
@@ -100,7 +177,7 @@ $totalNotifications = 0;
 if(isset($_SESSION['user_phone'])){
     $ph = $_SESSION['user_phone'];
     $nq = mysqli_query($conn, "SELECT COUNT(*) as total FROM orders WHERE customer_phone = '$ph' AND status IN ('Menunggu Konfirmasi', 'Dikirim')");
-    $totalNotifications = mysqli_fetch_assoc($nq)['total'];
+    if($nq) $totalNotifications = mysqli_fetch_assoc($nq)['total'];
 }
 
 if(!empty($_SESSION['cart'])){
@@ -812,7 +889,7 @@ body {
         </ul>
         <div class="nav-icons">
             <button class="nav-icon-btn" onclick="alert('Fitur notifikasi akan segera hadir!')">
-                <i class="fas fa-bell"></i>
+                
                 <?php if($totalNotifications > 0): ?>
                 <span class="notif-count"><?= $totalNotifications ?></span>
                 <?php endif; ?>
@@ -858,15 +935,6 @@ body {
 
 <?php if(!empty($_SESSION['cart'])): ?>
 
-    <!-- Voucher strip -->
-    <div class="voucher-strip" onclick="alert('Fitur voucher segera hadir!')">
-        <div class="voucher-left">
-            <div class="voucher-icon"><i class="fas fa-ticket-alt"></i></div>
-            Semua voucher
-        </div>
-        <i class="fas fa-chevron-right" style="color: var(--text-gray); font-size: 0.8rem;"></i>
-    </div>
-
     <!-- Shop Group -->
     <div class="shop-group">
 
@@ -898,15 +966,22 @@ body {
             <input type="checkbox" class="item-check item-checkbox" checked
                 onchange="updateTotal()" data-price="<?= $subtotal ?>">
 
-            <?php if(!empty($item['image'])): ?>
-            <div class="item-image" onclick="window.location='index.php'">
-                <img src="<?= htmlspecialchars($item['image']) ?>"
-                     alt="<?= htmlspecialchars($item['name']) ?>"
-                     onerror="this.parentElement.innerHTML='<div style=\'display:flex;align-items:center;justify-content:center;height:100%;font-size:2rem;color:#8B6F4E;opacity:.4\'><i class=\'fas fa-utensils\'></i></div>'">
-            </div>
-            <?php else: ?>
-            <div class="item-image-placeholder"><i class="fas fa-utensils"></i></div>
-            <?php endif; ?>
+           <?php
+$img = $item['image'] ?? '';
+// Normalisasi path: hapus leading slash/dot agar relatif
+$img = ltrim($img, './');
+$imgPath = __DIR__ . '/' . $img;
+$imgExists = !empty($img) && file_exists($imgPath);
+?>
+<?php if($imgExists): ?>
+<div class="item-image" onclick="window.location='index.php'">
+    <img src="<?= htmlspecialchars($img) ?>"
+         alt="<?= htmlspecialchars($item['name']) ?>"
+         onerror="this.parentElement.outerHTML='<div class=\'item-image-placeholder\'><i class=\'fas fa-utensils\'></i></div>'">
+</div>
+<?php else: ?>
+<div class="item-image-placeholder"><i class="fas fa-utensils"></i></div>
+<?php endif; ?>
 
             <div class="item-body">
                 <?php if(in_array($item['name'], ['Ceker Mercon Tanpa Tulang','Pangsit Isi Ayam','Wonton Goreng/Rebus'])): ?>
@@ -922,14 +997,6 @@ body {
                 </div>
                 <?php endif; ?>
 
-                <!-- Flash sale (only for first few items for demo) -->
-                <?php if($index < 2): ?>
-                <div class="flash-sale-tag">
-                    <i class="fas fa-bolt"></i>
-                    Flash Sale
-                    <span class="flash-sale-countdown" id="countdown-<?= $index ?>">--:--:--</span>
-                </div>
-                <?php endif; ?>
 
                 <div class="item-price-row">
                     <span class="item-price">Rp<?= number_format($item['price'], 0, ',', '.') ?></span>
@@ -939,10 +1006,7 @@ body {
 
                 <div class="sold-count"><?= rand(5,50) ?> terjual kemarin</div>
 
-                <div class="bonus-line">
-                    <i class="fas fa-gift"></i>
-                    Dapatkan diskon 8% dengan bonus
-                </div>
+                
 
                 <!-- Qty Control -->
                 <div class="qty-row">
@@ -1074,30 +1138,9 @@ body {
                                 <input type="radio" name="payment_method" value="COD" checked style="accent-color:var(--primary);width:18px;height:18px;">
                             </div>
                         </div>
-                        <div class="payment-card" onclick="selectPayment('qris', this)">
-                            <div class="d-flex align-items-center gap-3">
-                                <div style="width:46px;height:46px;background:linear-gradient(135deg,#8B6F4E,#D4A574);border-radius:10px;display:flex;align-items:center;justify-content:center;color:white;font-size:1.3rem;">
-                                    <i class="fas fa-qrcode"></i>
-                                </div>
-                                <div class="flex-grow-1">
-                                    <div style="font-weight:700;font-size:0.95rem;color:var(--text-dark);">QRIS</div>
-                                    <div style="font-size:0.8rem;color:var(--text-gray);">Scan QR Code untuk bayar</div>
-                                </div>
-                                <input type="radio" name="payment_method" value="QRIS" style="accent-color:var(--primary);width:18px;height:18px;">
-                            </div>
-                            <?php if(isset($_SESSION['qris_image'])): ?>
-                            <div class="text-center mt-3">
-                                <img src="<?= $_SESSION['qris_image'] ?>" alt="QRIS" style="max-width:180px;border:2px solid var(--primary);border-radius:8px;">
-                            </div>
-                            <?php else: ?>
-                            <div class="text-center mt-3 p-3" style="border:2px dashed var(--border);border-radius:8px;cursor:pointer;" onclick="document.getElementById('qrisInput').click()">
-                                <i class="fas fa-cloud-upload-alt fa-2x mb-2" style="color:var(--text-gray);"></i>
-                                <div style="font-size:0.82rem;color:var(--text-gray);">Klik untuk upload QRIS</div>
-                                <input type="file" id="qrisInput" name="qris_image" accept="image/*" style="display:none;" onchange="this.form.submit()">
-                            </div>
-                            <?php endif; ?>
-                        </div>
-                    </div>
+                    </div><!-- tutup co-section pembayaran -->
+
+                    <!-- Catatan -->
 
                     <!-- Catatan -->
                     <div class="co-section">
@@ -1289,5 +1332,122 @@ document.addEventListener('DOMContentLoaded', () => {
     startCountdown();
 });
 </script>
+<!-- MODAL SUKSES WHATSAPP OTOMATIS -->
+<?php 
+$last_order_number   = $_SESSION['last_order_number']   ?? '';
+$last_order_total    = $_SESSION['last_order_total']    ?? 0;
+$last_order_name     = $_SESSION['last_order_name']     ?? '';
+$last_order_phone    = $_SESSION['last_order_phone']    ?? '';
+$last_order_address  = $_SESSION['last_order_address']  ?? '';
+$last_order_city     = $_SESSION['last_order_city']     ?? '';
+$last_order_province = $_SESSION['last_order_province'] ?? '';
+$last_order_notes    = $_SESSION['last_order_notes']    ?? '';
+$last_order_items    = $_SESSION['last_order_items']    ?? [];
+
+$wa_number = '6281234567890';
+$wa_res = mysqli_query($conn, "SELECT whatsapp_number FROM settings LIMIT 1");
+if($wa_res && $wa_row = mysqli_fetch_assoc($wa_res)){
+    $wa_raw = preg_replace('/[^0-9]/', '', $wa_row['whatsapp_number']);
+    if(!empty($wa_raw)){
+        if(substr($wa_raw, 0, 1) == '0') $wa_raw = '62' . substr($wa_raw, 1);
+        $wa_number = $wa_raw;
+    }
+}
+
+$wa_link = '#';
+if(!empty($last_order_number)){
+    // Pesan WA otomatis lengkap dengan rincian pesanan
+    $wa_msg  = "🔥 *PESANAN BARU - TEXCER HOT* 🔥\n";
+    $wa_msg .= "━━━━━━━━━━━━━━━━━━━━\n\n";
+    $wa_msg .= "📋 *No. Pesanan:* {$last_order_number}\n";
+    $wa_msg .= "📅 *Tanggal:* " . date('d/m/Y H:i') . " WIB\n\n";
+    $wa_msg .= "👤 *DATA PEMBELI*\n";
+    $wa_msg .= "━━━━━━━━━━━━━━━━━━━━\n";
+    $wa_msg .= "Nama     : {$last_order_name}\n";
+    $wa_msg .= "No. HP   : {$last_order_phone}\n";
+    $wa_msg .= "Alamat   : {$last_order_address}\n";
+    $wa_msg .= "Kota     : {$last_order_city}\n";
+    $wa_msg .= "Provinsi : {$last_order_province}\n\n";
+    $wa_msg .= "🛒 *DETAIL PESANAN*\n";
+    $wa_msg .= "━━━━━━━━━━━━━━━━━━━━\n";
+    foreach($last_order_items as $it){
+        $nm = $it['name'];
+        if(!empty($it['variant'])) $nm .= " ({$it['variant']})";
+        $wa_msg .= "• {$nm}\n";
+        $wa_msg .= "  {$it['qty']} x Rp" . number_format($it['price'],0,',','.') . " = *Rp" . number_format($it['sub'],0,',','.') . "*\n";
+    }
+    $wa_msg .= "━━━━━━━━━━━━━━━━━━━━\n";
+    $wa_msg .= "🚚 *Ongkir: GRATIS*\n";
+    $wa_msg .= "💳 *Pembayaran: COD (Bayar di Tempat)*\n";
+    $wa_msg .= "💰 *TOTAL BAYAR: Rp" . number_format($last_order_total,0,',','.') . "*\n";
+    if(!empty($last_order_notes)){
+        $wa_msg .= "\n📝 *Catatan:* {$last_order_notes}\n";
+    }
+    $wa_msg .= "\n━━━━━━━━━━━━━━━━━━━━\n";
+    $wa_msg .= "Mohon segera dikonfirmasi kak! 🙏\n";
+    $wa_msg .= "Terima kasih sudah memesan di *Texcer Hot* 🌶️";
+
+    $wa_link = 'https://wa.me/' . $wa_number . '?text=' . rawurlencode($wa_msg);
+}
+
+if(isset($_GET['success']) && $_GET['success'] == '1' && !empty($last_order_number)):
+    // Simpan ke variabel temp SEBELUM unset session
+    $temp_number  = $last_order_number;
+    $temp_total   = $last_order_total;
+    $temp_wa_link = $wa_link; // pakai $wa_link yang sudah dibangun di atas
+    unset(
+        $_SESSION['last_order_number'], $_SESSION['last_order_total'],
+        $_SESSION['last_order_name'],   $_SESSION['last_order_phone'],
+        $_SESSION['last_order_address'],$_SESSION['last_order_city'],
+        $_SESSION['last_order_province'],$_SESSION['last_order_notes'],
+        $_SESSION['last_order_items']
+    );
+?>
+<div class="success-modal-overlay" id="successModal">
+    <div class="success-modal-box">
+        <div class="success-icon-wrap"><i class="fas fa-check"></i></div>
+        <h2>Pesanan Berhasil! 🎉</h2>
+        <p>Pesanan kamu sudah masuk ya kak!</p>
+        <p>Klik tombol di bawah untuk konfirmasi ke Admin ✅</p>
+        <div class="success-order-num"><?= htmlspecialchars($temp_number) ?></div>
+        <div style="font-size:1.05rem;font-weight:800;color:#8B6F4E;margin-bottom:20px;">
+            Total: Rp<?= number_format($temp_total,0,',','.') ?>
+        </div>
+
+        <!-- Tombol WhatsApp — pesan otomatis sudah terisi lengkap -->
+        <a href="<?= htmlspecialchars($temp_wa_link) ?>" target="_blank" class="btn-wa">
+            <i class="fab fa-whatsapp" style="font-size:1.3rem;"></i>
+            <div>
+                <div>Konfirmasi via WhatsApp</div>
+                <div style="font-size:0.75rem;opacity:.85;font-weight:400;">Pesan otomatis sudah siap, tinggal klik Kirim 📤</div>
+            </div>
+        </a>
+        
+        <!-- Tombol Tutup -->
+        <button class="btn-close-success" onclick="closeSuccessModal()">Lihat Riwayat Pesanan</button>
+    </div>
+</div>
+
+<script>
+function closeSuccessModal() {
+    document.getElementById('successModal').style.display = 'none';
+    window.location.href = 'riwayat.php';
+}
+</script>
+
+<style>
+.success-modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.55); display: flex; justify-content: center; align-items: center; z-index: 9999; padding: 16px; }
+.success-modal-box { background: white; padding: 36px 28px; border-radius: 16px; text-align: center; max-width: 420px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,0.25); animation: popIn .3s cubic-bezier(.34,1.56,.64,1); }
+@keyframes popIn { from { transform: scale(.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.success-icon-wrap { width: 72px; height: 72px; background: linear-gradient(135deg,#25D366,#128C7E); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 18px; font-size: 2rem; color: #fff; }
+.success-modal-box h2 { font-size: 1.35rem; font-weight: 800; color: #3D2914; margin-bottom: 8px; }
+.success-modal-box p { color: #8B7355; font-size: 0.88rem; margin-bottom: 4px; }
+.success-order-num { display: inline-block; background: #FDF8F3; border: 1px solid #E8DDD4; border-radius: 8px; padding: 6px 16px; font-size: 0.95rem; font-weight: 700; color: #8B6F4E; margin: 10px 0 6px; }
+.btn-wa { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; padding: 14px 18px; background: #25D366; color: #fff; border: none; border-radius: 12px; font-weight: 700; font-size: 1rem; cursor: pointer; text-decoration: none; transition: all .2s; margin-bottom: 10px; }
+.btn-wa:hover { background: #1ebe5d; color: #fff; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(37,211,102,0.35); }
+.btn-close-success { width: 100%; padding: 12px; background: #f0ebe5; color: #3D2914; border: none; border-radius: 10px; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: background .2s; }
+.btn-close-success:hover { background: #E8DDD4; }
+</style>
+<?php endif; ?>
 </body>
 </html>
