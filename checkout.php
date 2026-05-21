@@ -888,12 +888,6 @@ body {
             <li><a href="riwayat.php">Pesanan</a></li>
         </ul>
         <div class="nav-icons">
-            <button class="nav-icon-btn" onclick="alert('Fitur notifikasi akan segera hadir!')">
-                
-                <?php if($totalNotifications > 0): ?>
-                <span class="notif-count"><?= $totalNotifications ?></span>
-                <?php endif; ?>
-            </button>
             <a href="checkout.php">
                 <i class="fas fa-shopping-bag"></i>
                 <?php if(isset($_SESSION['cart']) && count($_SESSION['cart']) > 0): ?>

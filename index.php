@@ -3588,8 +3588,19 @@ function omSubmit() {
     var pricePerItem = omState.basePrice + topSum + (omState.levelPrice || 0);
     
     // Siapkan Nama Varian untuk ditampilkan di Checkout
-    var variantName = omState.levelName || omState.suhu || 'Regular';
-    var itemName = omState.name + ' (' + variantName + ')';
+// Kumpulkan nama topping yang dipilih
+var toppingNames = [];
+for (var tid in omState.toppings) {
+    if (omState.toppings[tid]) toppingNames.push(omState.toppings[tid].name);
+}
+
+var variantName = omState.levelName || omState.suhu || 'Regular';
+
+// Gabungkan level + topping untuk nama item
+var itemName = omState.name + ' (' + variantName + ')';
+if (toppingNames.length > 0) {
+    itemName += ' + ' + toppingNames.join(', ');
+}
     
     // ✅ FIX: Isi Hidden Input Form yang sudah ada di HTML index.php
     // Form ID: modalFormPesan
